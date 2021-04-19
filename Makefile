@@ -4,7 +4,7 @@ phpspy_ldflags:=$(LDFLAGS)
 phpspy_includes:=-I. -I./vendor
 phpspy_defines:=
 phpspy_tests:=$(wildcard tests/test_*.sh)
-phpspy_sources:=phpspy.c pgrep.c top.c addr_objdump.c event_fout.c event_callgrind.c
+phpspy_sources:=phpspy.c pgrep.c top.c addr_objdump.c event_fout.c event_callgrind.c pyroscope_api.c
 
 termbox_inlcudes=-Ivendor/termbox/
 termbox_libs:=-Wl,-Bstatic -Lvendor/termbox/ -ltermbox -Wl,-Bdynamic
@@ -28,7 +28,8 @@ endif
 all: phpspy_static
 
 phpspy_static: $(wildcard *.c *.h) vendor/termbox/libtermbox.a
-	$(CC) $(phpspy_cflags) $(phpspy_includes) $(termbox_inlcudes) $(phpspy_defines) $(phpspy_sources) -o phpspy $(phpspy_ldflags) $(phpspy_libs) $(termbox_libs)
+	$(CC) $(phpspy_cflags) $(phpspy_includes) $(termbox_inlcudes) $(phpspy_defines) $(phpspy_sources) -c $(phpspy_ldflags) $(phpspy_libs) $(termbox_libs)
+	ar rcs libphpspy.a *.o
 
 phpspy_dynamic: $(wildcard *.c *.h)
 	@$(or $(has_termbox), $(error Need libtermbox. Hint: try `make phpspy_static`))
