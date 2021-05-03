@@ -67,28 +67,6 @@ static int do_trace_74(trace_context_t *context);
 static int do_trace_80(trace_context_t *context);
 #endif
 
-int main(int argc, char **argv) {
-    int rv;
-    parse_opts(argc, argv);
-
-    if (opt_top_mode != 0) {
-        rv = main_top(argc, argv);
-    } else if (opt_pid != -1) {
-        rv = main_pid(opt_pid);
-    } else if (opt_pgrep_args != NULL) {
-        in_pgrep_mode = 1;
-        rv = main_pgrep();
-    } else if (optind < argc) {
-        rv = main_fork(argc, argv);
-    } else {
-        log_error("Expected pid (-p), pgrep (-P), or command\n\n");
-        usage(stderr, 1);
-        rv = 1;
-    }
-    cleanup();
-    return rv;
-}
-
 void usage(FILE *fp, int exit_code) {
     fprintf(fp, "Usage:\n");
     fprintf(fp, "  phpspy [options] -p <pid>\n");
