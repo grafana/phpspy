@@ -41,9 +41,6 @@ int phpspy_snapshot(pid_t pid, void* ptr, int len, void* err_ptr, int err_len) {
     int rv = 0;
     trace_context_t context;
     const trace_loc_t* loc = &context.event.frame.loc;
-    const size_t str_items = 3;
-    const size_t str_items_len = str_items * PHPSPY_STR_SIZE;
-    const fileno_str_len = 6 * PHPSPY_STR_SIZE;
 
     memset(&context, 0, sizeof(trace_context_t));
     context.target.pid = pid;
@@ -75,22 +72,21 @@ int phpspy_snapshot(pid_t pid, void* ptr, int len, void* err_ptr, int err_len) {
         return err_msg_len < err_len ? -err_msg_len : -err_len;
     }
 
-    if((str_items_len + fileno_str_len) < len)
-    {
-        int err_msg_len = snprintf((char*)err_ptr, err_len, "Not enough space for output string");
-        return -err_msg_len;
-    }
-
     char out_fmt[] = "%s:%d - %s::%s";
     /* '+ 1' is to get rid of '<' chracter in the name of a function */
     int written = snprintf((char*)ptr, len, out_fmt, loc->file, loc->lineno, loc->class, loc->func + 1);
 
-    /* This is done coz 'written' may be bigger than true size of the string
-     * '- 1' is to get rid of the '>' character in the name of a function */
-    int data_len = written < len ? (written - 1) : len;
-    ((char*)ptr)[data_len] = '\0';
+    /* This is done coz 'written' may be bigger than true size of the string */
+    if(written > len)
+    {
+        int err_msg_len = snprintf((char*)err_ptr, err_len, "Not enough space! %d > %d", written, len);
+        return -err_msg_len;
+    }
 
     context.event_handler(&context, PHPSPY_TRACE_EVENT_DEINIT);
 
-    return data_len;
+    /* '- 1' is to get rid of the '>' character in the name of a function */
+    written = written - 1;
+    ((char*)ptr)[written] = '\0';
+    return written;
 }
