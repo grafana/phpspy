@@ -9,7 +9,7 @@ int main(int argc, char **argv)
     printf("Application pid is %d\n", pid);
 
     const int err_len = 200;
-    const int data_len = 1000;
+    const int data_len = 2000;
     char err_buffer[err_len];
     char data_buffer[data_len];
 

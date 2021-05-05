@@ -1,4 +1,4 @@
-phpspy_cflags:=-std=c90 -Wall -Wextra -pedantic -g -O3 $(CFLAGS)
+phpspy_cflags:=-std=c90 -Wall -Wextra -pedantic -g $(CFLAGS)
 phpspy_libs:=-pthread $(LDLIBS)
 phpspy_ldflags:=$(LDFLAGS)
 phpspy_includes:=-I. -I./vendor
@@ -30,6 +30,9 @@ all: phpspy_static
 phpspy_static: $(wildcard *.c *.h) vendor/termbox/libtermbox.a
 	$(CC) $(phpspy_cflags) $(phpspy_includes) $(termbox_inlcudes) $(phpspy_defines) $(phpspy_sources) -c $(phpspy_ldflags) $(phpspy_libs) $(termbox_libs)
 	ar rcs libphpspy.a *.o
+
+phpspy_executable: phpspy_static
+	$(CC) $(phpspy_cflags) $(phpspy_includes) $(phpspy_defines) $(phpspy_ldflags) $(phpspy_libs) ./test.c libphpspy.a -o test
 
 phpspy_dynamic: $(wildcard *.c *.h)
 	@$(or $(has_termbox), $(error Need libtermbox. Hint: try `make phpspy_static`))
