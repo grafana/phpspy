@@ -3,14 +3,41 @@
 /* TODO This is done in the same way in phpspy, so until they fix it, it has to stay like it is */
 #include "phpspy.c"
 
-#define MAX_FRAMES 50
+#define MAX_STACK_DEPTH 50
 
+/* TODO: Will this be shared between all currently debugged php app? I highly doubt!
+ * Those would be a separate conteiners, right?
+ * But what about phpspy itself and use cases other than pyroscope?*/
 typedef struct stack_trace_t {
-    trace_frame_t frames[MAX_FRAMES];
+    trace_frame_t frames[MAX_STACK_DEPTH];
 } stack_trace_t;
 
+#define handle_error(__rv, __err_ptr, __err_len)                         \
+do{                                                                      \
+    if((__rv & PHPSPY_OK) != 0)                                          \
+    {                                                                    \
+        int err_msg_len = 0;                                             \
+        switch(__rv)                                                     \
+        {                                                                \
+            case PHPSPY_ERR_PID_DEAD:                                    \
+            {                                                            \
+                err_msg_len = snprintf((char*)__err_ptr, __err_len,      \
+                        "App with PID %d is dead!", context.target.pid); \
+                break;                                                   \
+            }                                                            \
+            default:                                                     \
+            {                                                            \
+                err_msg_len = snprintf((char*)__err_ptr, __err_len,      \
+                        "Unknown error: %d", __rv);                      \
+                break;                                                   \
+            }                                                            \
+        }                                                                \
+        return err_msg_len < __err_len ? -err_msg_len : -__err_len;      \
+    }                                                                    \
+} while(0)
+
 int phpspy_init(pid_t pid, void* err_ptr, int err_len) {
-    opt_max_stack_depth = MAX_FRAMES;
+    opt_max_stack_depth = MAX_STACK_DEPTH;
   return 0;
 }
 
@@ -19,38 +46,17 @@ int phpspy_cleanup(pid_t pid, void* err_ptr, int err_len) {
 }
 
 int event_handler(struct trace_context_s *context, int event_type) {
-    /* TODO: Ensure no memory leaks. Maybe mempool? */
     /* TODO: Do some profiling. How fast is fast enough? */
-
     switch (event_type) {
-        case PHPSPY_TRACE_EVENT_INIT:
-            {
-                context->event_udata = calloc(1, sizeof(stack_trace_t));
-                break;
-            }
-        case PHPSPY_TRACE_EVENT_STACK_BEGIN:
-            {
-                break;
-            }
         case PHPSPY_TRACE_EVENT_FRAME:
             {
                 stack_trace_t* stack_trace = (stack_trace_t*)context->event_udata;
                 memcpy(&stack_trace->frames[context->event.frame.depth], &context->event.frame, sizeof(trace_frame_t));
                 break;
             }
-        case PHPSPY_TRACE_EVENT_STACK_END:
-            {
-                break;
-            }
         case PHPSPY_TRACE_EVENT_ERROR:
-        case PHPSPY_TRACE_EVENT_DEINIT:
             {
-                if(context->event_udata)
-                {
-                    free(context->event_udata);
-                    context->event_udata = NULL;
-                }
-                break;
+                return PHPSPY_TRACE_EVENT_ERROR;
             }
     }
     return PHPSPY_OK;
@@ -74,38 +80,8 @@ void get_process_cwd(char** app_cwd, pid_t pid)
     }
 }
 
-int do_trace_safe(struct trace_context_s* context, char* err_ptr, int err_len)
+int parse_output(struct trace_context_s* context, char** app_root_dir, char* data_ptr, int data_len, void* err_ptr, int err_len)
 {
-    int rv = 0;
-    /* TODO Determine PHP version or make sure you can use ZEND */
-    rv |= do_trace(context);
-
-    if((rv & PHPSPY_OK) != 0)
-    {
-        try(rv, context->event_handler(context, PHPSPY_TRACE_EVENT_ERROR));
-        int err_msg_len = 0;
-        switch(rv)
-        {
-            case PHPSPY_ERR_PID_DEAD:
-            {
-                err_msg_len = snprintf((char*)err_ptr, err_len, "Application with PID %d is dead!", context->target.pid);
-                break;
-            }
-            /* TODO: maybe expand? */
-            default:
-            {
-                err_msg_len = snprintf((char*)err_ptr, err_len, "Unknown error");
-                break;
-            }
-        }
-        return err_msg_len < err_len ? -err_msg_len : -err_len;
-    }
-    return 0;
-}
-
-int parse_output(struct trace_context_s* context, char** app_cwd, char* data_ptr, int data_len, void* err_ptr, int err_len)
-{
-    int rv = 0;
     /* TODO: Handle lineno == '-1'? or pyroscope shall do it? */
     int written = 0;
     const int nof_frames = context->event.frame.depth;
@@ -117,10 +93,10 @@ int parse_output(struct trace_context_s* context, char** app_cwd, char* data_ptr
         char* write_buffer = ((char*)data_ptr) + written;
 
         int file_path_beginning = 0;
-        if(*app_cwd)
+        if(*app_root_dir)
         {
-            const int root_path_len = strlen(*app_cwd);
-            if(memcmp(loc->file, *app_cwd, root_path_len) == 0)
+            const int root_path_len = strlen(*app_root_dir);
+            if(memcmp(loc->file, *app_root_dir, root_path_len) == 0)
             {
                 file_path_beginning = root_path_len + 1;
             }
@@ -140,42 +116,37 @@ int parse_output(struct trace_context_s* context, char** app_cwd, char* data_ptr
 
         if(written > data_len)
         {
-            try(rv, context->event_handler(context, PHPSPY_TRACE_EVENT_ERROR));
-            free(*app_cwd);
-            (*app_cwd) = NULL;
+            if(*app_root_dir)
+            {
+                free(*app_root_dir);
+                (*app_root_dir) = NULL;
+            }
             int err_msg_len = snprintf((char*)err_ptr, err_len, "Not enough space! %d > %d", written, data_len);
             return -err_msg_len;
         }
     }
-
     return written;
 }
 
 int phpspy_snapshot(pid_t pid, void* ptr, int len, void* err_ptr, int err_len) {
-    int rv = 0;
-    struct trace_context_s context;
+    static struct trace_context_s context;
+    static stack_trace_t stack_trace;
 
-    memset(&context, 0, sizeof(trace_context_t));
+    context.event_udata = (void*)&stack_trace;
     context.target.pid = pid;
     context.event_handler = event_handler;
 
-    try(rv, find_addresses(&context.target));
+    handle_error(find_addresses(&context.target), err_ptr, err_len);
+    handle_error(do_trace(&context), err_ptr, err_len);
 
-    try(rv, context.event_handler(&context, PHPSPY_TRACE_EVENT_INIT));
-
-    try(rv, do_trace_safe(&context, err_ptr, err_len));
-
-    char* app_cwd = NULL;
-    get_process_cwd(&app_cwd, pid);
-
-    int written = parse_output(&context, &app_cwd,  ptr, len, err_ptr, err_len);
-    if(app_cwd)
+    char* app_root_dir = NULL;
+    /* TODO: get_process_cwd(&app_root_dir, pid); */
+    int written = parse_output(&context, &app_root_dir,  ptr, len, err_ptr, err_len);
+    if(app_root_dir)
     {
-        free(app_cwd);
-        app_cwd = NULL;
+        free(app_root_dir);
+        app_root_dir = NULL;
     }
-
-    try(rv, context.event_handler(&context, PHPSPY_TRACE_EVENT_DEINIT));
 
     return written;
 }
