@@ -38,6 +38,18 @@ do{                                                                      \
     }                                                                    \
 } while(0)
 
+void get_process_cwd(char* app_cwd, pid_t pid)
+{
+    char buf[PATH_MAX];
+    snprintf(buf, PATH_MAX, "/proc/%d/cwd", pid);
+    int app_cwd_len = readlink(buf, app_cwd, PATH_MAX);
+
+    if(app_cwd_len < 0)
+    {
+        app_cwd[0] = '\0';
+    }
+}
+
 struct trace_context_s context;
 stack_trace_t stack_trace;
 int phpspy_init(pid_t pid, void* err_ptr, int err_len) {
@@ -56,7 +68,6 @@ int phpspy_cleanup(pid_t pid, void* err_ptr, int err_len) {
 }
 
 int event_handler(struct trace_context_s *context, int event_type) {
-    /* TODO: Do some profiling. How fast is fast enough? */
     switch (event_type) {
         case PHPSPY_TRACE_EVENT_FRAME:
             {
@@ -70,18 +81,6 @@ int event_handler(struct trace_context_s *context, int event_type) {
             }
     }
     return PHPSPY_OK;
-}
-
-void get_process_cwd(char* app_cwd, pid_t pid)
-{
-    char buf[PATH_MAX];
-    snprintf(buf, PATH_MAX, "/proc/%d/cwd", pid);
-    int app_cwd_len = readlink(buf, app_cwd, PATH_MAX);
-
-    if(app_cwd_len < 0)
-    {
-        app_cwd[0] = '\0';
-    }
 }
 
 int parse_output(struct trace_context_s* context, char* app_root_dir, char* data_ptr, int data_len, void* err_ptr, int err_len)
@@ -105,15 +104,15 @@ int parse_output(struct trace_context_s* context, char* app_root_dir, char* data
             }
         }
 
-        if(loc->class_len > 0)
+        if(loc->lineno == -1)
         {
-            char out_fmt[] = "%s:%d - %s::%s; ";
-            written += snprintf(write_buffer, data_len, out_fmt, &loc->file[file_path_beginning], loc->lineno, loc->class, loc->func);
+            char out_fmt[] = "%s - %s%s%s; ";
+            written += snprintf(write_buffer, data_len, out_fmt, &loc->file[file_path_beginning], loc->class_len ? loc->class : "", loc->class_len? "::" : "", loc->func);
         }
         else
         {
-            char out_fmt[] = "%s:%d - %s; ";
-            written += snprintf(write_buffer, data_len, out_fmt, &loc->file[file_path_beginning], loc->lineno, loc->func);
+            char out_fmt[] = "%s:%d - %s%s%s; ";
+            written += snprintf(write_buffer, data_len, out_fmt, &loc->file[file_path_beginning], loc->lineno, loc->class_len ? loc->class : "", loc->class_len? "::" : "", loc->func);
         }
 
         if(written > data_len)
@@ -129,6 +128,5 @@ int phpspy_snapshot(pid_t pid, void* ptr, int len, void* err_ptr, int err_len) {
     handle_error(find_addresses(&context.target), err_ptr, err_len);
     handle_error(do_trace(&context), err_ptr, err_len);
     int written = parse_output(&context, &stack_trace.app_root_dir[0],  ptr, len, err_ptr, err_len);
-
     return written;
 }
