@@ -1,4 +1,6 @@
-phpspy_cflags:=-std=c90 -Wall -Wextra -pedantic -g $(CFLAGS)
+include $(RTE_SDK)/mk/rte.vars.mk
+
+phpspy_cflags:=-std=c90 -Wall -Wextra -pedantic -O3 $(CFLAGS)
 phpspy_libs:=-pthread $(LDLIBS)
 phpspy_ldflags:=$(LDFLAGS)
 phpspy_includes:=-I. -I./vendor
@@ -32,7 +34,7 @@ phpspy_static: $(wildcard *.c *.h) vendor/termbox/libtermbox.a
 	ar rcs libphpspy.a *.o
 
 phpspy_executable: phpspy_static
-	$(CC) $(phpspy_cflags) $(phpspy_includes) $(phpspy_defines) $(phpspy_ldflags) $(phpspy_libs) ./test.c libphpspy.a -o test
+	$(CC) $(phpspy_cflags) $(phpspy_includes) -I/usr/include/dpdk/ $(phpspy_defines) $(phpspy_ldflags) -ldpdk $(phpspy_libs) ./test.c libphpspy.a -o test
 
 phpspy_dynamic: $(wildcard *.c *.h)
 	@$(or $(has_termbox), $(error Need libtermbox. Hint: try `make phpspy_static`))
@@ -65,3 +67,5 @@ clean:
 	rm -f phpspy
 
 .PHONY: all test install clean phpspy_static phpspy_dynamic
+
+include $(RTE_SDK)/mk/rte.app.mk

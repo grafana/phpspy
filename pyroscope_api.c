@@ -60,11 +60,12 @@ int phpspy_init(pid_t pid, void* err_ptr, int err_len) {
     context.target.pid = pid;
     context.event_handler = event_handler;
     get_process_cwd(&stack_trace.app_root_dir[0], pid);
-  return 0;
+    handle_error(find_addresses(&context.target), err_ptr, err_len);
+    return 0;
 }
 
 int phpspy_cleanup(pid_t pid, void* err_ptr, int err_len) {
-  return 0;
+    return 0;
 }
 
 int event_handler(struct trace_context_s *context, int event_type) {
@@ -125,7 +126,6 @@ int parse_output(struct trace_context_s* context, char* app_root_dir, char* data
 }
 
 int phpspy_snapshot(pid_t pid, void* ptr, int len, void* err_ptr, int err_len) {
-    handle_error(find_addresses(&context.target), err_ptr, err_len);
     handle_error(do_trace(&context), err_ptr, err_len);
     int written = parse_output(&context, &stack_trace.app_root_dir[0],  ptr, len, err_ptr, err_len);
     return written;
