@@ -35,10 +35,7 @@ phpspy_static: $(wildcard *.c *.h) vendor/termbox/libtermbox.a
 	ar rcs libphpspy.a *.o
 
 phpspy_tests: phpspy_static
-	$(CC) $(phpspy_cppflags) $(phpspy_includes) $(phpspy_defines) $(phpspy_ldflags) -lstdc++ -I /usr/src/gtest -L /usr/local/lib -lpthread -lgtest_main -lgtest $(phpspy_libs) ./pyroscope_api_tests.cpp libphpspy.a -o pyroscope_api_tests
-
-phpspy_executable: phpspy_static
-	$(CC) $(phpspy_cflags) $(phpspy_includes) -I/usr/include/dpdk/ $(phpspy_defines) $(phpspy_ldflags) -ldpdk $(phpspy_libs) ./sandbox.c libphpspy.a -o sandbox
+	$(CC) $(phpspy_cppflags) $(phpspy_includes) $(phpspy_defines) $(phpspy_ldflags) -lstdc++ -I/usr/include/dpdk/ -I /usr/src/gtest -L /usr/local/lib -ldpdk  -lgtest $(phpspy_libs) ./pyroscope_api_tests.cpp ./gtest_main.cpp libphpspy.a -o pyroscope_api_tests
 
 phpspy_dynamic: $(wildcard *.c *.h)
 	@$(or $(has_termbox), $(error Need libtermbox. Hint: try `make phpspy_static`))
