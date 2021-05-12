@@ -2,6 +2,8 @@
 <?php
 $x = 1;
 
+chdir('/tmp/');
+
 function wait_a_moment() {
     sleep(1);
 }

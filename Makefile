@@ -1,7 +1,7 @@
 include $(RTE_SDK)/mk/rte.vars.mk
 
-phpspy_cflags:=-std=c90 -Wall -Wextra -pedantic -g $(CFLAGS)
-phpspy_cppflags:=-std=c++11 -Wall -Wextra -pedantic -g $(CFLAGS) $(CPPFLAGS)
+phpspy_cflags:=-std=c90 -Wall -Wextra -pedantic -O3 $(CFLAGS)
+phpspy_cppflags:=-std=c++11 -Wall -Wextra -pedantic -O3 $(CFLAGS) $(CPPFLAGS)
 phpspy_libs:=-pthread $(LDLIBS)
 phpspy_ldflags:=$(LDFLAGS)
 phpspy_includes:=-I. -I./vendor
