@@ -1,6 +1,7 @@
 include $(RTE_SDK)/mk/rte.vars.mk
 
-phpspy_cflags:=-std=c90 -Wall -Wextra -pedantic -O3 $(CFLAGS)
+phpspy_cflags:=-std=c90 -Wall -Wextra -pedantic -g $(CFLAGS)
+phpspy_cppflags:=-std=c++11 -Wall -Wextra -pedantic -g $(CFLAGS) $(CPPFLAGS)
 phpspy_libs:=-pthread $(LDLIBS)
 phpspy_ldflags:=$(LDFLAGS)
 phpspy_includes:=-I. -I./vendor
@@ -33,8 +34,11 @@ phpspy_static: $(wildcard *.c *.h) vendor/termbox/libtermbox.a
 	$(CC) $(phpspy_cflags) $(phpspy_includes) $(termbox_inlcudes) $(phpspy_defines) $(phpspy_sources) -c $(phpspy_ldflags) $(phpspy_libs) $(termbox_libs)
 	ar rcs libphpspy.a *.o
 
+phpspy_tests: phpspy_static
+	$(CC) $(phpspy_cppflags) $(phpspy_includes) $(phpspy_defines) $(phpspy_ldflags) -lstdc++ -I /usr/src/gtest -L /usr/local/lib -lpthread -lgtest_main -lgtest $(phpspy_libs) ./pyroscope_api_tests.cpp libphpspy.a -o pyroscope_api_tests
+
 phpspy_executable: phpspy_static
-	$(CC) $(phpspy_cflags) $(phpspy_includes) -I/usr/include/dpdk/ $(phpspy_defines) $(phpspy_ldflags) -ldpdk $(phpspy_libs) ./test.c libphpspy.a -o test
+	$(CC) $(phpspy_cflags) $(phpspy_includes) -I/usr/include/dpdk/ $(phpspy_defines) $(phpspy_ldflags) -ldpdk $(phpspy_libs) ./sandbox.c libphpspy.a -o sandbox
 
 phpspy_dynamic: $(wildcard *.c *.h)
 	@$(or $(has_termbox), $(error Need libtermbox. Hint: try `make phpspy_static`))

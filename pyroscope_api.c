@@ -14,29 +14,31 @@ typedef struct stack_trace_t {
     char app_root_dir[PATH_MAX];
 } stack_trace_t;
 
-#define handle_error(__rv, __err_ptr, __err_len)                         \
-do{                                                                      \
-    if((__rv & PHPSPY_OK) != 0)                                          \
-    {                                                                    \
-        int err_msg_len = 0;                                             \
-        switch(__rv)                                                     \
-        {                                                                \
-            case PHPSPY_ERR_PID_DEAD:                                    \
-            {                                                            \
-                err_msg_len = snprintf((char*)__err_ptr, __err_len,      \
-                        "App with PID %d is dead!", context.target.pid); \
-                break;                                                   \
-            }                                                            \
-            default:                                                     \
-            {                                                            \
-                err_msg_len = snprintf((char*)__err_ptr, __err_len,      \
-                        "Unknown error: %d", __rv);                      \
-                break;                                                   \
-            }                                                            \
-        }                                                                \
-        return err_msg_len < __err_len ? -err_msg_len : -__err_len;      \
-    }                                                                    \
-} while(0)
+int formulate_error_msg(int rv, struct trace_context_s* context, char* err_ptr, int err_len)
+{
+    int err_msg_len = 0;
+    if(rv != (PHPSPY_OK))
+    {
+        rv &= ~PHPSPY_ERR;
+        switch(rv)
+        {
+            case (PHPSPY_ERR_PID_DEAD):
+            {
+                err_msg_len = snprintf((char*)err_ptr, err_len,
+                        "App with PID %d is dead!", context->target.pid);
+                break;
+            }
+            default:
+            {
+                err_msg_len = snprintf((char*)err_ptr, err_len,
+                        "Unknown error: %d", rv);
+                break;
+            }
+        }
+        return err_msg_len < err_len ? -err_msg_len : -err_len;
+    }
+    return 0;
+}
 
 void get_process_cwd(char* app_cwd, pid_t pid)
 {
@@ -53,6 +55,7 @@ void get_process_cwd(char* app_cwd, pid_t pid)
 struct trace_context_s context;
 stack_trace_t stack_trace;
 int phpspy_init(pid_t pid, void* err_ptr, int err_len) {
+    int rv = 0;
     opt_max_stack_depth = MAX_STACK_DEPTH;
     memset(&stack_trace, 0, sizeof(stack_trace_t));
     memset(&context, 0, sizeof(struct trace_context_s));
@@ -60,8 +63,8 @@ int phpspy_init(pid_t pid, void* err_ptr, int err_len) {
     context.target.pid = pid;
     context.event_handler = event_handler;
     get_process_cwd(&stack_trace.app_root_dir[0], pid);
-    handle_error(find_addresses(&context.target), err_ptr, err_len);
-    return 0;
+    try(rv, formulate_error_msg(find_addresses(&context.target), &context, err_ptr, err_len));
+    return rv;
 }
 
 int phpspy_cleanup(pid_t pid, void* err_ptr, int err_len) {
@@ -126,7 +129,8 @@ int parse_output(struct trace_context_s* context, char* app_root_dir, char* data
 }
 
 int phpspy_snapshot(pid_t pid, void* ptr, int len, void* err_ptr, int err_len) {
-    handle_error(do_trace(&context), err_ptr, err_len);
+    int rv = 0;
+    try(rv, formulate_error_msg(do_trace(&context), &context, err_ptr, err_len));
     int written = parse_output(&context, &stack_trace.app_root_dir[0],  ptr, len, err_ptr, err_len);
     return written;
 }

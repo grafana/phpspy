@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <rte_eal.h>
 
 int main(int argc, char **argv)
 {
@@ -10,6 +12,8 @@ int main(int argc, char **argv)
     char err_buffer[err_len];
     char data_buffer[data_len];
 
+    memset(&err_buffer[0], 0, err_len);
+    memset(&data_buffer[0], 0, data_len);
     pid_t pid = (pid_t)atoi(argv[1]);
     printf("Application pid is %d\n", pid);
 
@@ -24,7 +28,7 @@ int main(int argc, char **argv)
         {
             printf("Data buffer: %s\n", data_buffer);
         }
-        if(snapshot_len < 0)
+        if(err_buffer[0] != '\0')
         {
             printf("Error buffer: %s\n", err_buffer);
         }
