@@ -1,6 +1,4 @@
 #include "pyroscope_api.h"
-#include <linux/limits.h>
-#include <rte_cycles.h>
 #include <unistd.h>
 
 /* TODO This is done in the same way in phpspy, so until they fix it, it has to
@@ -8,13 +6,31 @@
 #include "phpspy.c"
 
 #define MAX_STACK_DEPTH 50
+#define MAX_PIDS 50
 
-int event_handler(struct trace_context_s *context, int event_type);
-
-typedef struct stack_trace_t {
-  trace_frame_t frames[MAX_STACK_DEPTH];
+typedef struct pyroscope_context_t {
+  pid_t pid;
   char app_root_dir[PATH_MAX];
-} stack_trace_t;
+  trace_frame_t frames[MAX_STACK_DEPTH];
+  struct trace_context_s phpspy_context;
+} pyroscope_context_t;
+
+pyroscope_context_t pyroscope_contexts[MAX_PIDS];
+
+int event_handler(struct trace_context_s *context, int event_type) {
+  switch (event_type) {
+  case PHPSPY_TRACE_EVENT_FRAME: {
+    trace_frame_t *frames = (trace_frame_t *)context->event_udata;
+    memcpy(&frames[context->event.frame.depth], &context->event.frame,
+           sizeof(trace_frame_t));
+    break;
+  }
+  case PHPSPY_TRACE_EVENT_ERROR: {
+    return PHPSPY_TRACE_EVENT_ERROR;
+  }
+  }
+  return PHPSPY_OK;
+}
 
 int formulate_error_msg(int rv, struct trace_context_s *context, char *err_ptr,
                         int err_len) {
@@ -46,46 +62,14 @@ void get_process_cwd(char *app_cwd, pid_t pid) {
   }
 }
 
-struct trace_context_s context;
-stack_trace_t stack_trace;
-int phpspy_init(pid_t pid, void *err_ptr, int err_len) {
-  int rv = 0;
-  opt_max_stack_depth = MAX_STACK_DEPTH;
-  memset(&stack_trace, 0, sizeof(stack_trace_t));
-  memset(&context, 0, sizeof(struct trace_context_s));
-  context.event_udata = (void *)&stack_trace;
-  context.target.pid = pid;
-  context.event_handler = event_handler;
-  get_process_cwd(&stack_trace.app_root_dir[0], pid);
-  try(rv, formulate_error_msg(find_addresses(&context.target), &context, err_ptr, err_len));
-  return rv;
-}
-
-int phpspy_cleanup(pid_t pid, void *err_ptr, int err_len) { return 0; }
-
-int event_handler(struct trace_context_s *context, int event_type) {
-  switch (event_type) {
-  case PHPSPY_TRACE_EVENT_FRAME: {
-    stack_trace_t *stack_trace = (stack_trace_t *)context->event_udata;
-    memcpy(&stack_trace->frames[context->event.frame.depth],
-           &context->event.frame, sizeof(trace_frame_t));
-    break;
-  }
-  case PHPSPY_TRACE_EVENT_ERROR: {
-    return PHPSPY_TRACE_EVENT_ERROR;
-  }
-  }
-  return PHPSPY_OK;
-}
-
 int parse_output(struct trace_context_s *context, char *app_root_dir,
                  char *data_ptr, int data_len, void *err_ptr, int err_len) {
   int written = 0;
   const int nof_frames = context->event.frame.depth;
   for (int current_frame_idx = (nof_frames - 1); current_frame_idx >= 0;
        current_frame_idx--) {
-    stack_trace_t *stack_trace = (stack_trace_t *)context->event_udata;
-    trace_loc_t *loc = &stack_trace->frames[current_frame_idx].loc;
+    trace_frame_t *frames = (trace_frame_t *)context->event_udata;
+    trace_loc_t *loc = &frames[current_frame_idx].loc;
 
     char *write_buffer = ((char *)data_ptr) + written;
 
@@ -121,9 +105,85 @@ int parse_output(struct trace_context_s *context, char *app_root_dir,
   return written;
 }
 
+int phpspy_init(pid_t pid, void *err_ptr, int err_len) {
+  int rv = 0;
+  opt_max_stack_depth = MAX_STACK_DEPTH;
+
+  pyroscope_context_t *pyroscope_context = NULL;
+  for (int i = 0; i < MAX_PIDS; i++) {
+    if (pyroscope_contexts[i].pid == 0) {
+      pyroscope_context = &pyroscope_contexts[i];
+      break;
+    }
+  }
+
+  if (NULL == pyroscope_context) {
+    int err_msg_len =
+        snprintf((char *)err_ptr, err_len,
+                 "Exceeded maximum allowed number of processes: %d", MAX_PIDS);
+    return -err_msg_len;
+  }
+
+  memset(pyroscope_context, 0, sizeof(pyroscope_context_t));
+  pyroscope_context->pid = pid;
+  pyroscope_context->phpspy_context.event_udata = pyroscope_context->frames;
+  pyroscope_context->phpspy_context.target.pid = pid;
+  pyroscope_context->phpspy_context.event_handler = event_handler;
+
+  get_process_cwd(&pyroscope_context->app_root_dir[0], pid);
+
+  try
+    (rv, formulate_error_msg(
+             find_addresses(&pyroscope_context->phpspy_context.target),
+             &pyroscope_context->phpspy_context, err_ptr, err_len));
+
+  return rv;
+}
+
 int phpspy_snapshot(pid_t pid, void *ptr, int len, void *err_ptr, int err_len) {
   int rv = 0;
-  try(rv, formulate_error_msg(do_trace(&context), &context, err_ptr, err_len));
-  int written = parse_output(&context, &stack_trace.app_root_dir[0], ptr, len, err_ptr, err_len);
+
+  pyroscope_context_t *pyroscope_context = NULL;
+  for (int i = 0; i < MAX_PIDS; i++) {
+    if (pyroscope_contexts[i].pid == pid) {
+      pyroscope_context = &pyroscope_contexts[i];
+      break;
+    }
+  }
+
+  if (NULL == pyroscope_context) {
+    int err_msg_len = snprintf((char *)err_ptr, err_len,
+                               "Phpspy not initialized for %d pid", pid);
+    return -err_msg_len;
+  }
+
+  try
+    (rv,
+     formulate_error_msg(do_trace(&pyroscope_context->phpspy_context),
+                         &pyroscope_context->phpspy_context, err_ptr, err_len));
+  int written = parse_output(&pyroscope_context->phpspy_context,
+                             &pyroscope_context->app_root_dir[0], ptr, len,
+                             err_ptr, err_len);
+
   return written;
+}
+
+int phpspy_cleanup(pid_t pid, void *err_ptr, int err_len) {
+  pyroscope_context_t *pyroscope_context = NULL;
+  for (int i = 0; i < MAX_PIDS; i++) {
+    if (pyroscope_contexts[i].pid == pid) {
+      pyroscope_context = &pyroscope_contexts[i];
+      break;
+    }
+  }
+
+  if (NULL == pyroscope_context) {
+    int err_msg_len = snprintf((char *)err_ptr, err_len,
+                               "Phpspy not initialized for %d pid", pid);
+    return -err_msg_len;
+  }
+
+  memset(pyroscope_context, 0, sizeof(pyroscope_context_t));
+
+  return 0;
 }
