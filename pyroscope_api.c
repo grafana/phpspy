@@ -109,17 +109,29 @@ int parse_output(struct trace_context_s *context, const char *app_root_dir,
   return written;
 }
 
+pyroscope_context_t *find_first_free_context() {
+  for (int i = 0; i < MAX_PIDS; i++) {
+    if (pyroscope_contexts[i].pid == 0) {
+      return &pyroscope_contexts[i];
+    }
+  }
+  return NULL;
+}
+
+pyroscope_context_t *find_matching_context(pid_t pid) {
+  for (int i = 0; i < MAX_PIDS; i++) {
+    if (pyroscope_contexts[i].pid == pid) {
+      return &pyroscope_contexts[i];
+    }
+  }
+  return NULL;
+}
+
 int phpspy_init(pid_t pid, void *err_ptr, int err_len) {
   int rv = 0;
   opt_max_stack_depth = MAX_STACK_DEPTH;
 
-  pyroscope_context_t *pyroscope_context = NULL;
-  for (int i = 0; i < MAX_PIDS; i++) {
-    if (pyroscope_contexts[i].pid == 0) {
-      pyroscope_context = &pyroscope_contexts[i];
-      break;
-    }
-  }
+  pyroscope_context_t *pyroscope_context = find_first_free_context();
 
   if (NULL == pyroscope_context) {
     int err_msg_len =
@@ -147,13 +159,7 @@ int phpspy_init(pid_t pid, void *err_ptr, int err_len) {
 int phpspy_snapshot(pid_t pid, void *ptr, int len, void *err_ptr, int err_len) {
   int rv = 0;
 
-  pyroscope_context_t *pyroscope_context = NULL;
-  for (int i = 0; i < MAX_PIDS; i++) {
-    if (pyroscope_contexts[i].pid == pid) {
-      pyroscope_context = &pyroscope_contexts[i];
-      break;
-    }
-  }
+  pyroscope_context_t *pyroscope_context = find_matching_context(pid);
 
   if (NULL == pyroscope_context) {
     int err_msg_len = snprintf((char *)err_ptr, err_len,
@@ -165,6 +171,7 @@ int phpspy_snapshot(pid_t pid, void *ptr, int len, void *err_ptr, int err_len) {
     (rv,
      formulate_error_msg(do_trace(&pyroscope_context->phpspy_context),
                          &pyroscope_context->phpspy_context, err_ptr, err_len));
+
   int written = parse_output(&pyroscope_context->phpspy_context,
                              &pyroscope_context->app_root_dir[0], ptr, len,
                              err_ptr, err_len);
@@ -173,13 +180,7 @@ int phpspy_snapshot(pid_t pid, void *ptr, int len, void *err_ptr, int err_len) {
 }
 
 int phpspy_cleanup(pid_t pid, void *err_ptr, int err_len) {
-  pyroscope_context_t *pyroscope_context = NULL;
-  for (int i = 0; i < MAX_PIDS; i++) {
-    if (pyroscope_contexts[i].pid == pid) {
-      pyroscope_context = &pyroscope_contexts[i];
-      break;
-    }
-  }
+  pyroscope_context_t *pyroscope_context = find_matching_context(pid);
 
   if (NULL == pyroscope_context) {
     int err_msg_len = snprintf((char *)err_ptr, err_len,
