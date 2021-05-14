@@ -115,9 +115,9 @@ static int trace_stack(trace_context_t *context, zend_execute_data *remote_execu
         }
         if (zfunc.common.scope) {
             try_copy_proc_mem("zce", zfunc.common.scope, &zce, sizeof(zce));
-            try(rv, sprint_zstring(context, "class_name", zce.name, frame->loc.class, sizeof(frame->loc.class), &frame->loc.class_len));
+            try(rv, sprint_zstring(context, "class_name", zce.name, frame->loc.class_name, sizeof(frame->loc.class_name), &frame->loc.class_len));
         } else {
-            frame->loc.class[0] = '\0';
+            frame->loc.class_name[0] = '\0';
             frame->loc.class_len = 0;
         }
         if (zfunc.type == 2) {

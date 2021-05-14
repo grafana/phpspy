@@ -4,9 +4,13 @@
 #include <rte_cycles.h>
 
 extern "C" {
+#include "phpspy.h"
 #include "pyroscope_api.h"
 void get_process_cwd(char *app_cwd, pid_t pid);
+int parse_output(struct trace_context_s *context, const char *app_root_dir,
+                 char *data_ptr, int data_len, void *err_ptr, int err_len);
 }
+
 extern std::map<std::string, pid_t> php_apps;
 std::string app1_name = "main.php";
 std::string app2_name = "main_chdir.php";
@@ -23,9 +27,9 @@ public:
     char cwd_buf[PATH_MAX]{};
     getcwd(&cwd_buf[0], PATH_MAX);
     gtest_cwd = std::string(cwd_buf);
-    app1_expected_stacktrace =
-        app1_name + ":5 - wait_a_moment; <internal> - sleep; ";
-    app2_expected_stacktrace = gtest_cwd + "/" + app2_name +
+    app1_expected_stacktrace = "tests/pyroscope_api/" + app1_name +
+                               ":5 - wait_a_moment; <internal> - sleep; ";
+    app2_expected_stacktrace = gtest_cwd + "/tests/pyroscope_api/" + app2_name +
                                ":7 - wait_a_moment; <internal> - sleep; ";
   }
   void SetUp() {
@@ -66,7 +70,7 @@ TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_same_pid) {
 
 TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_wrong_pid) {
   constexpr pid_t wrong_pid = -1;
-  std::string expected_err_msg = "Unknown error: 1";
+  std::string expected_err_msg = "General error!";
   EXPECT_EQ(phpspy_init(wrong_pid, &err_buf[0], err_len),
             -static_cast<int>(expected_err_msg.size()));
   EXPECT_STREQ(err_buf, expected_err_msg.c_str());
@@ -117,6 +121,84 @@ TEST_F(PyroscopeApiTestsSingleApp, get_process_cwd) {
   char buf[PATH_MAX]{};
   get_process_cwd(&buf[0], app_pid);
   EXPECT_STREQ(buf, gtest_cwd.c_str());
+}
+
+class PyroscopeApiTestsParseOutput : public PyroscopeApiTestsSingleApp {
+public:
+  void SetUp() {
+    memset(&context, 0, sizeof(struct trace_context_s));
+    memset(&frames, 0, sizeof(frames));
+    context.event_udata = static_cast<void *>(&frames);
+  }
+
+  void prepare_frame(std::string func, std::string class_name, std::string file,
+                     int lineno, int frameno) {
+    ASSERT_LT(frameno, max_frames);
+    auto &frame = frames[frameno];
+    strcpy(frame.loc.func, func.c_str());
+    strcpy(frame.loc.class_name, class_name.c_str());
+    strcpy(frame.loc.file, file.c_str());
+    frame.loc.func_len = strlen(frame.loc.func);
+    frame.loc.file_len = strlen(frame.loc.file);
+    frame.loc.class_len = strlen(frame.loc.class_name);
+    frame.loc.lineno = lineno;
+    context.event.frame.depth++;
+  }
+  static constexpr int max_frames = 50;
+  trace_frame_t frames[max_frames]{};
+  struct trace_context_s context {};
+};
+
+TEST_F(PyroscopeApiTestsParseOutput, parse_output_ok) {
+  const char app_root_dir[] = "/app/root/dir/";
+  std::string expected_stacktrace =
+      "file2:12 - class2::func2; file1:10 - class1::func1; ";
+  prepare_frame("func1", "class1", "file1", 10, 0);
+  prepare_frame("func2", "class2", "file2", 12, 1);
+
+  EXPECT_EQ(parse_output(&context, &app_root_dir[0], &data_buf[0], data_len,
+                         &err_buf[0], err_len),
+            expected_stacktrace.size());
+  EXPECT_STREQ(data_buf, expected_stacktrace.c_str());
+  EXPECT_STREQ(err_buf, "");
+}
+
+TEST_F(PyroscopeApiTestsParseOutput, parse_output_no_class) {
+  const char app_root_dir[] = "/app/root/dir/";
+  std::string expected_stacktrace = "file2:12 - func2; file1:10 - func1; ";
+  prepare_frame("func1", "", "file1", 10, 0);
+  prepare_frame("func2", "", "file2", 12, 1);
+
+  EXPECT_EQ(parse_output(&context, &app_root_dir[0], &data_buf[0], data_len,
+                         &err_buf[0], err_len),
+            expected_stacktrace.size());
+  EXPECT_STREQ(data_buf, expected_stacktrace.c_str());
+  EXPECT_STREQ(err_buf, "");
+}
+
+TEST_F(PyroscopeApiTestsParseOutput, parse_output_lineno) {
+  const char app_root_dir[] = "/app/root/dir/";
+  std::string expected_stacktrace = "file2:12 - func2; file1 - func1; ";
+  prepare_frame("func1", "", "file1", -1, 0);
+  prepare_frame("func2", "", "file2", 12, 1);
+
+  EXPECT_EQ(parse_output(&context, &app_root_dir[0], &data_buf[0], data_len,
+                         &err_buf[0], err_len),
+            expected_stacktrace.size());
+  EXPECT_STREQ(data_buf, expected_stacktrace.c_str());
+  EXPECT_STREQ(err_buf, "");
+}
+
+TEST_F(PyroscopeApiTestsParseOutput, parse_output_not_enough_space) {
+  std::string expected_error = "Not enough space! 18 > 10";
+  const char app_root_dir[] = "/app/root/dir/";
+  prepare_frame("func1", "", "file1", 10, 0);
+  prepare_frame("func2", "", "file2", 12, 1);
+
+  EXPECT_EQ(parse_output(&context, &app_root_dir[0], &data_buf[0], 10,
+                         &err_buf[0], err_len),
+            -static_cast<int>(expected_error.size()));
+  EXPECT_STREQ(err_buf, expected_error.c_str());
 }
 
 class PyroscopeApiTestsProfiling : public PyroscopeApiTestsSingleApp {
@@ -205,7 +287,7 @@ class PyroscopeApiTestsMultipleApp : public PyroscopeApiTestsBase {
 
 public:
   PyroscopeApiTestsMultipleApp() {
-      /* TODO: move to the base class */
+    /* TODO: move to the base class */
     {
       App app;
       app.app_name = std::string("main.php");

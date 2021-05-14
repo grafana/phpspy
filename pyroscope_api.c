@@ -42,8 +42,13 @@ int formulate_error_msg(int rv, struct trace_context_s *context, char *err_ptr,
                              "App with PID %d is dead!", context->target.pid);
       break;
     }
+    case (PHPSPY_ERR): {
+      err_msg_len = snprintf((char *)err_ptr, err_len, "General error!");
+      break;
+    }
     default: {
-      err_msg_len = snprintf((char *)err_ptr, err_len, "Unknown error: %d", rv);
+      err_msg_len = snprintf((char *)err_ptr, err_len, "Unknown error code: %u",
+                             (unsigned int)rv & ~((unsigned int)PHPSPY_ERR));
       break;
     }
     }
@@ -62,16 +67,17 @@ void get_process_cwd(char *app_cwd, pid_t pid) {
   }
 }
 
-int parse_output(struct trace_context_s *context, char *app_root_dir,
+int parse_output(struct trace_context_s *context, const char *app_root_dir,
                  char *data_ptr, int data_len, void *err_ptr, int err_len) {
   int written = 0;
   const int nof_frames = context->event.frame.depth;
+
   for (int current_frame_idx = (nof_frames - 1); current_frame_idx >= 0;
        current_frame_idx--) {
     trace_frame_t *frames = (trace_frame_t *)context->event_udata;
     trace_loc_t *loc = &frames[current_frame_idx].loc;
 
-    char *write_buffer = ((char *)data_ptr) + written;
+    char *write_cursor = ((char *)data_ptr) + written;
 
     int file_path_beginning = 0;
     if (app_root_dir[0] != '\0') {
@@ -83,16 +89,14 @@ int parse_output(struct trace_context_s *context, char *app_root_dir,
 
     if (loc->lineno == -1) {
       char out_fmt[] = "%s - %s%s%s; ";
-      written += snprintf(write_buffer, data_len, out_fmt,
-                          &loc->file[file_path_beginning],
-                          loc->class_len ? loc->class : "",
+      written += snprintf(write_cursor, data_len, out_fmt,
+                          &loc->file[file_path_beginning], loc->class_name,
                           loc->class_len ? "::" : "", loc->func);
     } else {
       char out_fmt[] = "%s:%d - %s%s%s; ";
-      written += snprintf(write_buffer, data_len, out_fmt,
-                          &loc->file[file_path_beginning], loc->lineno,
-                          loc->class_len ? loc->class : "",
-                          loc->class_len ? "::" : "", loc->func);
+      written += snprintf(
+          write_cursor, data_len, out_fmt, &loc->file[file_path_beginning],
+          loc->lineno, loc->class_name, loc->class_len ? "::" : "", loc->func);
     }
 
     if (written > data_len) {

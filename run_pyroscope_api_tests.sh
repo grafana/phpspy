@@ -1,8 +1,8 @@
 #!/bin/bash
 
-./main.php&
+./tests/pyroscope_api/main.php&
 pid_1=$!
-./main_chdir.php&
+./tests/pyroscope_api/main_chdir.php&
 pid_2=$!
 ./pyroscope_api_tests main.php ${pid_1} main_chdir.php ${pid_2}
 

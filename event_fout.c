@@ -50,7 +50,7 @@ int event_handler_fout(struct trace_context_s *context, int event_type) {
                 1,
                 "%d %.*s%s%.*s %.*s:%d",
                 frame->depth,
-                (int)frame->loc.class_len, frame->loc.class,
+                (int)frame->loc.class_len, frame->loc.class_name,
                 frame->loc.class_len > 0 ? "::" : "",
                 (int)frame->loc.func_len, frame->loc.func,
                 (int)frame->loc.file_len, frame->loc.file,

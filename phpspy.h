@@ -105,7 +105,7 @@ typedef struct glopeek_entry_s {
 
 typedef struct trace_loc_s {
     char func[PHPSPY_STR_SIZE];
-    char class[PHPSPY_STR_SIZE];
+    char class_name[PHPSPY_STR_SIZE];
     char file[PHPSPY_STR_SIZE];
     size_t func_len;
     size_t class_len;
