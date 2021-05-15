@@ -5,8 +5,8 @@
  * stay like it is */
 #include "phpspy.c"
 
-#define MAX_STACK_DEPTH 50
-#define MAX_PIDS 50
+#define MAX_STACK_DEPTH 64
+#define MAX_PIDS 32
 
 typedef struct pyroscope_context_t {
   pid_t pid;
@@ -131,6 +131,7 @@ int phpspy_init(pid_t pid, void *err_ptr, int err_len) {
   int rv = 0;
   opt_max_stack_depth = MAX_STACK_DEPTH;
 
+  /* TODO: Go dynamic. Linked list? */
   pyroscope_context_t *pyroscope_context = find_first_free_context();
 
   if (NULL == pyroscope_context) {
