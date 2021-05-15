@@ -72,8 +72,8 @@ TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_ok) {
 TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_exceed_max) {
   auto &app = apps[0];
   std::string expected_error_msg =
-      "Exceeded maximum allowed number of processes: 50";
-  for (int i = 0; i < 50; i++) {
+      "Exceeded maximum allowed number of processes: 32";
+  for (int i = 0; i < 32; i++) {
     EXPECT_EQ(phpspy_init(app.pid, &err_buf[0], err_len), 0);
     EXPECT_STREQ(err_buf, "");
   }
@@ -82,7 +82,7 @@ TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_exceed_max) {
             -static_cast<int>(expected_error_msg.size()));
   EXPECT_STREQ(err_buf, expected_error_msg.c_str());
 
-  for (int i = 0; i < 51; i++) {
+  for (int i = 0; i < 33; i++) {
     phpspy_cleanup(app.pid, &err_buf[0], err_len);
   }
 }
