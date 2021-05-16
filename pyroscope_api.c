@@ -88,12 +88,12 @@ int parse_output(struct trace_context_s *context, const char *app_root_dir,
     }
 
     if (loc->lineno == -1) {
-      char out_fmt[] = "%s - %s%s%s; ";
+      char out_fmt[] = "%s - %s%s%s;";
       written += snprintf(write_cursor, data_len, out_fmt,
                           &loc->file[file_path_beginning], loc->class_name,
                           loc->class_len ? "::" : "", loc->func);
     } else {
-      char out_fmt[] = "%s:%d - %s%s%s; ";
+      char out_fmt[] = "%s:%d - %s%s%s;";
       written += snprintf(
           write_cursor, data_len, out_fmt, &loc->file[file_path_beginning],
           loc->lineno, loc->class_name, loc->class_len ? "::" : "", loc->func);

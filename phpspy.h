@@ -194,7 +194,6 @@ extern int opt_fout_buffer_size;
 extern long opt_time_limit_ms;
 
 extern int main_pgrep();
-extern int main_pid(pid_t pid);
 extern int main_top(int argc, char **argv);
 
 extern void usage(FILE *fp, int exit_code);
