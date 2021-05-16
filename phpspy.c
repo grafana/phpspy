@@ -41,7 +41,6 @@ int in_pgrep_mode = 0;
 uint64_t trace_count = 0;
 
 static void parse_opts(int argc, char **argv);
-static int main_fork(int argc, char **argv);
 static void cleanup();
 static int pause_pid(pid_t pid);
 static int unpause_pid(pid_t pid);
@@ -318,130 +317,6 @@ static void parse_opts(int argc, char **argv) {
             case 't': opt_top_mode = 1; break;
         }
     }
-}
-
-int main_pid(pid_t pid) {
-    int rv;
-    trace_context_t context;
-    struct timespec start_time, end_time, sleep_time, _stop_time, limit_time;
-    struct timespec *stop_time;
-
-    memset(&context, 0, sizeof(trace_context_t));
-    context.target.pid = pid;
-    context.event_handler = opt_event_handler;
-    try(rv, find_addresses(&context.target));
-    try(rv, context.event_handler(&context, PHPSPY_TRACE_EVENT_INIT));
-
-    #ifdef USE_ZEND
-    do_trace_ptr = do_trace;
-    #else
-
-    if (strcmp(opt_phpv, "auto") == 0) {
-        try_get_php_version(&context.target);
-    }
-
-    if (strcmp("70", opt_phpv) == 0) {
-        do_trace_ptr = do_trace_70;
-    } else if (strcmp("71", opt_phpv) == 0) {
-        do_trace_ptr = do_trace_71;
-    } else if (strcmp("72", opt_phpv) == 0) {
-        do_trace_ptr = do_trace_72;
-    } else if (strcmp("73", opt_phpv) == 0) {
-        do_trace_ptr = do_trace_73;
-    } else if (strcmp("74", opt_phpv) == 0) {
-        do_trace_ptr = do_trace_74;
-    } else if (strcmp("80", opt_phpv) == 0) {
-        do_trace_ptr = do_trace_80;
-    } else {
-        do_trace_ptr = do_trace_72;
-    }
-    #endif
-
-    /* calc stop_time */
-    stop_time = NULL;
-    if (in_pgrep_mode) {
-        /* in pgrep mode, we use a SIGALRM (see main_pgrep) */
-    } else if (opt_time_limit_ms > 0) {
-        stop_time = &_stop_time;
-        limit_time.tv_sec = opt_time_limit_ms / 1000L;
-        limit_time.tv_nsec = (opt_time_limit_ms % 1000L) * 1000000L;
-        clock_get(stop_time);
-        clock_add(stop_time, &limit_time, stop_time);
-    }
-
-    while (!done) {
-        /* record start_time */
-        clock_get(&start_time);
-
-        /* trace (maybe with PTRACE_ATTACH) */
-        rv = 0;
-        if (opt_pause) rv |= pause_pid(pid);
-        rv |= do_trace_ptr(&context);
-        if (opt_pause) rv |= unpause_pid(pid);
-
-        /* bail if pid died */
-        if ((rv & PHPSPY_ERR_PID_DEAD) != 0) break;
-
-        /* maybe apply trace limit */
-        if (opt_trace_limit > 0 && rv == PHPSPY_OK) {
-            if (in_pgrep_mode) {
-                __atomic_add_fetch(&trace_count, 1, __ATOMIC_SEQ_CST);
-            } else {
-                trace_count += 1;
-            }
-            /* in pgrep mode, it is possible for each thread to sneak in one
-               extra trace even after the limit is reached but it should exit
-               after that. */
-            if (trace_count >= opt_trace_limit) break;
-        }
-
-        /* maybe apply time limit */
-        if (stop_time && clock_diff(&end_time, stop_time) >= 1) {
-            break;
-        }
-
-        /* calc sleep_time and sleep */
-        clock_get(&end_time);
-        calc_sleep_time(&end_time, &start_time, &sleep_time);
-        nanosleep(&sleep_time, NULL);
-    }
-
-    context.event_handler(&context, PHPSPY_TRACE_EVENT_DEINIT);
-
-    /* in pgrep mode, trigger done condition if we went over the trace limit.
-       it is ok for multiple threads to call this. */
-    if (in_pgrep_mode && opt_trace_limit > 0 && trace_count >= opt_trace_limit) {
-        write_done_pipe();
-    }
-
-    /* TODO proper signal handling for non-pgrep modes */
-    return PHPSPY_OK;
-}
-
-static int main_fork(int argc, char **argv) {
-    int rv, status;
-    pid_t fork_pid;
-    (void)argc;
-    fork_pid = fork();
-    if (fork_pid == 0) {
-        redirect_child_stdio(STDOUT_FILENO, opt_path_child_out);
-        redirect_child_stdio(STDERR_FILENO, opt_path_child_err);
-        ptrace(PTRACE_TRACEME, 0, NULL, NULL);
-        execvp(argv[optind], argv + optind);
-        perror("execvp");
-        exit(1);
-    } else if (fork_pid < 0) {
-        perror("fork");
-        exit(1);
-    }
-    waitpid(fork_pid, &status, 0);
-    if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGTRAP) {
-        log_error("main_fork: Expected SIGTRAP from child\n");
-    }
-    ptrace(PTRACE_DETACH, fork_pid, NULL, NULL);
-    rv = main_pid(fork_pid);
-    waitpid(fork_pid, NULL, 0);
-    return rv;
 }
 
 static void cleanup() {
