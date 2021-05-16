@@ -133,7 +133,7 @@ static void callgrind_sprint_loc(char *str, trace_loc_t *loc) {
     int len;
     len = snprintf(str, PHPSPY_STR_SIZE,
         "%.*s%s%.*s %.*s:%d",
-        (int)loc->class_len, loc->class,
+        (int)loc->class_len, loc->class_name,
         loc->class_len > 0 ? "::" : "",
         (int)loc->func_len, loc->func,
         (int)loc->file_len, loc->file,
@@ -205,14 +205,14 @@ static void callgrind_dump(callgrind_udata_t *udata) {
     HASH_ITER(hh, udata->callers, caller, caller_tmp) {
         fprintf(udata->fout, "\n");
         fprintf(udata->fout, "fl=%.*s\n", (int)caller->loc.file_len, caller->loc.file);
-        fprintf(udata->fout, "fn=%.*s%s%.*s\n", (int)caller->loc.class_len, caller->loc.class, caller->loc.class_len > 0 ? "::" : "", (int)caller->loc.func_len, caller->loc.func);
+        fprintf(udata->fout, "fn=%.*s%s%.*s\n", (int)caller->loc.class_len, caller->loc.class_name, caller->loc.class_len > 0 ? "::" : "", (int)caller->loc.func_len, caller->loc.func);
         fprintf(udata->fout, "%d %ld\n", caller->loc.lineno, caller->exclusive);
 
         HASH_SORT(caller->callees, callgrind_sort_callees);
         HASH_ITER(hh, caller->callees, callee, callee_tmp) {
             fprintf(udata->fout, "\n");
             fprintf(udata->fout, "cfl=%.*s\n", (int)callee->loc.file_len, callee->loc.file);
-            fprintf(udata->fout, "cfn=%.*s%s%.*s\n", (int)callee->loc.class_len, callee->loc.class, callee->loc.class_len > 0 ? "::" : "", (int)callee->loc.func_len, callee->loc.func);
+            fprintf(udata->fout, "cfn=%.*s%s%.*s\n", (int)callee->loc.class_len, callee->loc.class_name, callee->loc.class_len > 0 ? "::" : "", (int)callee->loc.func_len, callee->loc.func);
             fprintf(udata->fout, "calls=%ld %d\n", callee->count, callee->loc.lineno);
             fprintf(udata->fout, "%d %ld\n", caller->loc.lineno, callee->inclusive);
         }
