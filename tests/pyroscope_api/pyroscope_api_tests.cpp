@@ -1,7 +1,7 @@
 #include <fstream>
 #include <gtest/gtest.h>
 #include <iostream>
-#include <rte_cycles.h>
+//#include <rte_cycles.h>
 
 extern "C" {
 #include "phpspy.h"
@@ -39,7 +39,7 @@ public:
       app.name = std::string("main.php");
       app.pid = php_apps[app.name];
       app.expected_stacktrace = "tests/pyroscope_api/" + app.name +
-                                ":5 - wait_a_moment;<internal> - sleep";
+                                ":5 - wait_a_moment;<internal> - sleep;";
       apps.push_back(app);
     }
     {
@@ -47,7 +47,7 @@ public:
       app.name = std::string("main_chdir.php");
       app.pid = php_apps[app.name];
       app.expected_stacktrace = gtest_cwd + "/tests/pyroscope_api/" + app.name +
-                                ":7 - wait_a_moment;<internal> - sleep";
+                                ":7 - wait_a_moment;<internal> - sleep;";
       apps.push_back(app);
     }
   }
@@ -315,7 +315,7 @@ public:
 TEST_F(PyroscopeApiTestsParseOutput, formulate_output_ok) {
   const char app_root_dir[] = "/app/root/dir/";
   std::string expected_stacktrace =
-      "file2:12 - class2::func2;file1:10 - class1::func1";
+      "file2:12 - class2::func2;file1:10 - class1::func1;";
   prepare_frame("func1", "class1", "file1", 10, 0);
   prepare_frame("func2", "class2", "file2", 12, 1);
 
@@ -328,7 +328,7 @@ TEST_F(PyroscopeApiTestsParseOutput, formulate_output_ok) {
 
 TEST_F(PyroscopeApiTestsParseOutput, formulate_output_no_class) {
   const char app_root_dir[] = "/app/root/dir/";
-  std::string expected_stacktrace = "file2:12 - func2;file1:10 - func1";
+  std::string expected_stacktrace = "file2:12 - func2;file1:10 - func1;";
   prepare_frame("func1", "", "file1", 10, 0);
   prepare_frame("func2", "", "file2", 12, 1);
 
@@ -341,7 +341,7 @@ TEST_F(PyroscopeApiTestsParseOutput, formulate_output_no_class) {
 
 TEST_F(PyroscopeApiTestsParseOutput, formulate_output_lineno) {
   const char app_root_dir[] = "/app/root/dir/";
-  std::string expected_stacktrace = "file2:12 - func2;file1 - func1";
+  std::string expected_stacktrace = "file2:12 - func2;file1 - func1;";
   prepare_frame("func1", "", "file1", -1, 0);
   prepare_frame("func2", "", "file2", 12, 1);
 
@@ -363,7 +363,7 @@ TEST_F(PyroscopeApiTestsParseOutput, formulate_output_not_enough_space) {
             -static_cast<int>(expected_error.size()));
   EXPECT_STREQ(err_buf, expected_error.c_str());
 }
-
+/*
 class PyroscopeApiTestsProfiling : public PyroscopeApiTestsSingleApp {
 public:
   static constexpr float loops = 1024;
@@ -418,7 +418,7 @@ TEST_F(PyroscopeApiTestsProfiling, phpspy_snapshot_profiling) {
   EXPECT_LT(total_us / loops, time_constraint_us / 2);
   phpspy_cleanup(app.pid, &err_buf[0], err_len);
 }
-
+*/
 class PyroscopeApiTestsChdir : public PyroscopeApiTestsSingleApp {};
 
 TEST_F(PyroscopeApiTestsChdir, init_ok) {

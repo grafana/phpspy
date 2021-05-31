@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
-#include <rte_eal.h>
+//#include <rte_eal.h>
 
 std::map<std::string, pid_t> php_apps;
 
 int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
-  rte_eal_init(argc, argv);
+  // rte_eal_init(argc, argv);
 
   for (int i = 1; i < argc; i = i + 2) {
     std::string app_name(argv[i]);
