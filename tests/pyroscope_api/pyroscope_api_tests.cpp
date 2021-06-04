@@ -183,11 +183,9 @@ TEST_F(PyroscopeApiTestsLinkedList, allocate_few) {
   pyroscope_context_t *middle = allocate_context();
   pyroscope_context_t *last = allocate_context();
 
-  EXPECT_EQ(first->prev, nullptr);
+  EXPECT_EQ(first, first_ctx);
   EXPECT_EQ(first->next, middle);
-  EXPECT_EQ(middle->prev, first);
   EXPECT_EQ(middle->next, last);
-  EXPECT_EQ(last->prev, middle);
   EXPECT_EQ(last->next, nullptr);
 
   deallocate_context(first);
@@ -202,9 +200,8 @@ TEST_F(PyroscopeApiTestsLinkedList, allocate_few_deallocate_first) {
 
   deallocate_context(first);
 
-  EXPECT_EQ(middle->prev, nullptr);
+  EXPECT_EQ(middle, first_ctx);
   EXPECT_EQ(middle->next, last);
-  EXPECT_EQ(last->prev, middle);
   EXPECT_EQ(last->next, nullptr);
 
   deallocate_context(middle);
@@ -218,9 +215,8 @@ TEST_F(PyroscopeApiTestsLinkedList, allocate_few_deallocate_middle) {
 
   deallocate_context(middle);
 
-  EXPECT_EQ(first->prev, nullptr);
+  EXPECT_EQ(first, first_ctx);
   EXPECT_EQ(first->next, last);
-  EXPECT_EQ(last->prev, first);
   EXPECT_EQ(last->next, nullptr);
 
   deallocate_context(first);
@@ -234,9 +230,8 @@ TEST_F(PyroscopeApiTestsLinkedList, allocate_few_deallocate_last) {
 
   deallocate_context(last);
 
-  EXPECT_EQ(first->prev, nullptr);
+  EXPECT_EQ(first, first_ctx);
   EXPECT_EQ(first->next, middle);
-  EXPECT_EQ(middle->prev, first);
   EXPECT_EQ(middle->next, nullptr);
 
   deallocate_context(first);
@@ -252,15 +247,11 @@ TEST_F(PyroscopeApiTestsLinkedList, allocate_context_many) {
     allocated.push_back(ptr);
   }
 
-  pyroscope_context_t *prev = nullptr;
-  for (int i = 0; i < allocated.size(); i++) {
+  for (long unsigned int i = 0; i < allocated.size(); i++) {
     pyroscope_context_t *current = allocated[i];
     pyroscope_context_t *next = allocated[i + 1];
 
-    EXPECT_EQ(current->prev, prev);
     EXPECT_EQ(current->next, next);
-
-    prev = current;
   }
 
   for (auto *current : allocated) {
@@ -270,7 +261,6 @@ TEST_F(PyroscopeApiTestsLinkedList, allocate_context_many) {
 
     if (current != allocated.back()) {
       EXPECT_EQ(first_ctx, next);
-      EXPECT_EQ(first_ctx->prev, nullptr);
     }
   }
   EXPECT_EQ(first_ctx, nullptr);

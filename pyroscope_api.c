@@ -18,7 +18,6 @@ pyroscope_context_t *allocate_context() {
   while (1) {
     if (NULL == current->next) {
       current->next = calloc(sizeof(pyroscope_context_t), 1);
-      current->next->prev = current;
       return current->next;
     } else {
       current = current->next;
@@ -27,14 +26,17 @@ pyroscope_context_t *allocate_context() {
 }
 
 void deallocate_context(pyroscope_context_t *ctx) {
-  if (NULL != ctx->prev) {
-    ctx->prev->next = ctx->next;
-  } else {
+  if (ctx == first_ctx) {
     first_ctx = ctx->next;
-  }
-
-  if (NULL != ctx->next) {
-    ctx->next->prev = ctx->prev;
+  } else {
+    pyroscope_context_t *iter = first_ctx;
+    while (1) {
+      if (iter->next == ctx) {
+        iter->next = ctx->next;
+        break;
+      }
+      iter = iter->next;
+    }
   }
 
   free(ctx);
@@ -111,8 +113,8 @@ int formulate_output(struct trace_context_s *context, const char *app_root_dir,
   int written = 0;
   const int nof_frames = context->event.frame.depth;
 
-  for (int current_frame_idx = (nof_frames - 1); current_frame_idx >= 0;
-       current_frame_idx--) {
+  int current_frame_idx = (nof_frames - 1);
+  for (current_frame_idx; current_frame_idx >= 0; current_frame_idx--) {
     trace_frame_t *frames = (trace_frame_t *)context->event_udata;
     trace_loc_t *loc = &frames[current_frame_idx].loc;
 
@@ -162,10 +164,9 @@ int phpspy_init(pid_t pid, void *err_ptr, int err_len) {
 
   get_process_cwd(&pyroscope_context->app_root_dir[0], pid);
 
-  try
-    (rv, formulate_error_msg(
-             find_addresses(&pyroscope_context->phpspy_context.target),
-             &pyroscope_context->phpspy_context, err_ptr, err_len));
+  try(rv, formulate_error_msg(
+              find_addresses(&pyroscope_context->phpspy_context.target),
+              &pyroscope_context->phpspy_context, err_ptr, err_len));
 
   return rv;
 }
@@ -181,10 +182,9 @@ int phpspy_snapshot(pid_t pid, void *ptr, int len, void *err_ptr, int err_len) {
     return -err_msg_len;
   }
 
-  try
-    (rv,
-     formulate_error_msg(do_trace(&pyroscope_context->phpspy_context),
-                         &pyroscope_context->phpspy_context, err_ptr, err_len));
+  try(rv, formulate_error_msg(do_trace(&pyroscope_context->phpspy_context),
+                              &pyroscope_context->phpspy_context, err_ptr,
+                              err_len));
 
   int written = formulate_output(&pyroscope_context->phpspy_context,
                                  &pyroscope_context->app_root_dir[0], ptr, len,

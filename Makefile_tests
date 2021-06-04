@@ -1,6 +1,6 @@
 #include $(RTE_SDK)/mk/rte.vars.mk
 
-phpspy_cppflags:=-std=c++2a -Wall -Wextra -pedantic -g -Og $(CFLAGS) $(CPPFLAGS)
+phpspy_cppflags:=-std=c++2a -Wall -Wextra -pedantic -g -O3 $(CFLAGS) $(CPPFLAGS)
 
 include ./Makefile
 

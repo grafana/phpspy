@@ -13,8 +13,7 @@ typedef struct pyroscope_context_t {
   char app_root_dir[PATH_MAX];
   trace_frame_t frames[MAX_STACK_DEPTH];
   struct trace_context_s phpspy_context;
-  struct pyroscope_context_t* prev;
-  struct pyroscope_context_t* next;
+  struct pyroscope_context_t *next;
 } pyroscope_context_t;
 
 #endif
