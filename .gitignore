@@ -1,8 +1,9 @@
 phpspy
-libphpspy.a
-libphpspy.so
-pyroscope_api_tests
 *~
 \#*\#
 .\#*
 *.o
+*.a
+*.so
+pyroscope_api_tests
+.vscode/

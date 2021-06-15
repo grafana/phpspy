@@ -1,10 +1,9 @@
 #include "pyroscope_api.h"
-#include "pyroscope_api_struct.h"
+
 #include <unistd.h>
 
-/* TODO This is done in the same way in phpspy, so until they fix it, it has to
- * stay like it is */
-#include "phpspy.c"
+#include "phpspy.h"
+#include "pyroscope_api_struct.h"
 
 pyroscope_context_t *first_ctx = NULL;
 
@@ -60,15 +59,15 @@ pyroscope_context_t *find_matching_context(pid_t pid) {
 
 int event_handler(struct trace_context_s *context, int event_type) {
   switch (event_type) {
-  case PHPSPY_TRACE_EVENT_FRAME: {
-    trace_frame_t *frames = (trace_frame_t *)context->event_udata;
-    memcpy(&frames[context->event.frame.depth], &context->event.frame,
-           sizeof(trace_frame_t));
-    break;
-  }
-  case PHPSPY_TRACE_EVENT_ERROR: {
-    return PHPSPY_TRACE_EVENT_ERROR;
-  }
+    case PHPSPY_TRACE_EVENT_FRAME: {
+      trace_frame_t *frames = (trace_frame_t *)context->event_udata;
+      memcpy(&frames[context->event.frame.depth], &context->event.frame,
+             sizeof(trace_frame_t));
+      break;
+    }
+    case PHPSPY_TRACE_EVENT_ERROR: {
+      return PHPSPY_TRACE_EVENT_ERROR;
+    }
   }
   return PHPSPY_OK;
 }
@@ -78,20 +77,21 @@ int formulate_error_msg(int rv, struct trace_context_s *context, char *err_ptr,
   int err_msg_len = 0;
   if (rv != (PHPSPY_OK)) {
     switch (rv) {
-    case (((unsigned int)PHPSPY_ERR) & ((unsigned int)PHPSPY_ERR_PID_DEAD)): {
-      err_msg_len = snprintf((char *)err_ptr, err_len,
-                             "App with PID %d is dead!", context->target.pid);
-      break;
-    }
-    case (PHPSPY_ERR): {
-      err_msg_len = snprintf((char *)err_ptr, err_len, "General error!");
-      break;
-    }
-    default: {
-      err_msg_len = snprintf((char *)err_ptr, err_len, "Unknown error code: %u",
-                             (unsigned int)rv & ~((unsigned int)PHPSPY_ERR));
-      break;
-    }
+      case (((unsigned int)PHPSPY_ERR) & ((unsigned int)PHPSPY_ERR_PID_DEAD)): {
+        err_msg_len = snprintf((char *)err_ptr, err_len,
+                               "App with PID %d is dead!", context->target.pid);
+        break;
+      }
+      case (PHPSPY_ERR): {
+        err_msg_len = snprintf((char *)err_ptr, err_len, "General error!");
+        break;
+      }
+      default: {
+        err_msg_len =
+            snprintf((char *)err_ptr, err_len, "Unknown error code: %u",
+                     (unsigned int)rv & ~((unsigned int)PHPSPY_ERR));
+        break;
+      }
     }
     return err_msg_len < err_len ? -err_msg_len : -err_len;
   }
@@ -113,8 +113,8 @@ int formulate_output(struct trace_context_s *context, const char *app_root_dir,
   int written = 0;
   const int nof_frames = context->event.frame.depth;
 
-  int current_frame_idx = (nof_frames - 1);
-  for (current_frame_idx; current_frame_idx >= 0; current_frame_idx--) {
+  for (int current_frame_idx = (nof_frames - 1); current_frame_idx >= 0;
+       current_frame_idx--) {
     trace_frame_t *frames = (trace_frame_t *)context->event_udata;
     trace_loc_t *loc = &frames[current_frame_idx].loc;
 
@@ -152,20 +152,13 @@ int formulate_output(struct trace_context_s *context, const char *app_root_dir,
 
 int phpspy_init(pid_t pid, void *err_ptr, int err_len) {
   int rv = 0;
-  opt_max_stack_depth = MAX_STACK_DEPTH;
 
   pyroscope_context_t *pyroscope_context = allocate_context();
-
-  memset(pyroscope_context, 0, sizeof(pyroscope_context_t));
   pyroscope_context->pid = pid;
-  pyroscope_context->phpspy_context.event_udata = pyroscope_context->frames;
-  pyroscope_context->phpspy_context.target.pid = pid;
-  pyroscope_context->phpspy_context.event_handler = event_handler;
-
   get_process_cwd(&pyroscope_context->app_root_dir[0], pid);
-
   try(rv, formulate_error_msg(
-              find_addresses(&pyroscope_context->phpspy_context.target),
+              initialize(pid, &pyroscope_context->phpspy_context,
+                         &pyroscope_context->frames[0], event_handler),
               &pyroscope_context->phpspy_context, err_ptr, err_len));
 
   return rv;
@@ -194,15 +187,16 @@ int phpspy_snapshot(pid_t pid, void *ptr, int len, void *err_ptr, int err_len) {
 }
 
 int phpspy_cleanup(pid_t pid, void *err_ptr, int err_len) {
-  pyroscope_context_t *current = find_matching_context(pid);
+  pyroscope_context_t *pyroscope_context = find_matching_context(pid);
 
-  if (NULL == current) {
+  if (NULL == pyroscope_context) {
     int err_msg_len = snprintf((char *)err_ptr, err_len,
                                "Phpspy not initialized for %d pid", pid);
     return -err_msg_len;
   }
 
-  deallocate_context(current);
+  deinitialize(&pyroscope_context->phpspy_context);
+  deallocate_context(pyroscope_context);
 
   return 0;
 }

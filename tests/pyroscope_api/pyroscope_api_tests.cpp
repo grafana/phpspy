@@ -1,7 +1,8 @@
-#include <fstream>
 #include <gtest/gtest.h>
+
+#include <chrono>
+#include <fstream>
 #include <iostream>
-//#include <rte_cycles.h>
 
 extern "C" {
 #include "phpspy.h"
@@ -20,15 +21,20 @@ pyroscope_context_t *find_matching_context(pid_t pid);
 
 extern std::map<std::string, pid_t> php_apps;
 
+using std::chrono::duration;
+using std::chrono::duration_cast;
+using std::chrono::high_resolution_clock;
+using std::chrono::microseconds;
+
 class PyroscopeApiTestsBase : public ::testing::Test {
   class App {
-  public:
+   public:
     std::string name;
     pid_t pid;
     std::string expected_stacktrace;
   };
 
-public:
+ public:
   PyroscopeApiTestsBase() {
     char cwd_buf[PATH_MAX]{};
     getcwd(&cwd_buf[0], PATH_MAX);
@@ -66,7 +72,7 @@ public:
 };
 
 class PyroscopeApiTestsSingleApp : public PyroscopeApiTestsBase {
-public:
+ public:
 };
 
 TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_ok) {
@@ -75,7 +81,7 @@ TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_ok) {
   EXPECT_STREQ(err_buf, "");
   phpspy_cleanup(app.pid, &err_buf[0], err_len);
 }
-
+/*
 TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_allocate_a_lot) {
   constexpr int nof = 512;
   auto &app = apps[0];
@@ -88,7 +94,7 @@ TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_allocate_a_lot) {
     phpspy_cleanup(app.pid, &err_buf[0], err_len);
   }
 }
-
+*/
 TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_same_pid) {
   auto &app = apps[0];
   ASSERT_EQ(phpspy_init(app.pid, &err_buf[0], err_len), 0);
@@ -159,10 +165,9 @@ TEST_F(PyroscopeApiTestsSingleApp, get_process_cwd) {
 }
 
 class PyroscopeApiTestsLinkedList : public PyroscopeApiTestsBase {
-
   void TearDown() { ASSERT_EQ(first_ctx, nullptr); }
 
-public:
+ public:
 };
 
 TEST_F(PyroscopeApiTestsLinkedList, allocate_context_first) {
@@ -267,7 +272,6 @@ TEST_F(PyroscopeApiTestsLinkedList, allocate_context_many) {
 }
 
 TEST_F(PyroscopeApiTestsLinkedList, deallocate_context) {
-
   pyroscope_context_t *ptr = allocate_context();
   EXPECT_EQ(ptr, first_ctx);
 
@@ -277,7 +281,7 @@ TEST_F(PyroscopeApiTestsLinkedList, deallocate_context) {
 }
 
 class PyroscopeApiTestsParseOutput : public PyroscopeApiTestsSingleApp {
-public:
+ public:
   void SetUp() {
     memset(&context, 0, sizeof(struct trace_context_s));
     memset(&frames, 0, sizeof(frames));
@@ -353,31 +357,23 @@ TEST_F(PyroscopeApiTestsParseOutput, formulate_output_not_enough_space) {
             -static_cast<int>(expected_error.size()));
   EXPECT_STREQ(err_buf, expected_error.c_str());
 }
-/*
-class PyroscopeApiTestsProfiling : public PyroscopeApiTestsSingleApp {
-public:
-  static constexpr float loops = 1024;
 
-  uint64_t estimate_tsc_freq(void) {
-    uint64_t start = rte_rdtsc();
-    sleep(1);
-    return rte_rdtsc() - start;
-  }
+class PyroscopeApiTestsProfiling : public PyroscopeApiTestsSingleApp {
+ public:
+  static constexpr float loops = 899;
 };
 
 TEST_F(PyroscopeApiTestsProfiling, phpspy_init_profiling) {
   auto &app = apps[0];
-  uint64_t a = 0, b = 0, tsc_hz = 0, tsc = 0;
-  float us = 0, total_us = 0;
-  constexpr float time_constraint_us = 50000.f;
-  tsc_hz = estimate_tsc_freq();
+
+  constexpr float time_constraint_us = 30000.f;
+
+  auto t1 = high_resolution_clock::now();
   for (int i = 0; i < loops; i++) {
-    a = rte_rdtsc();
     phpspy_init(app.pid, &err_buf[0], err_len);
-    us = ((((rte_rdtsc() - a) * 1.f) / (tsc_hz * 1.f)) * 1000000.f);
-    total_us += us;
-    EXPECT_LT(us, time_constraint_us);
   }
+  auto t2 = high_resolution_clock::now();
+  auto total_us = duration_cast<microseconds>(t2 - t1).count();
   std::cout << "phpspy_init mean over " << loops
             << " runs: " << total_us / loops << " (us)" << std::endl;
   EXPECT_LT(total_us / loops, time_constraint_us / 2);
@@ -389,26 +385,27 @@ TEST_F(PyroscopeApiTestsProfiling, phpspy_init_profiling) {
 
 TEST_F(PyroscopeApiTestsProfiling, phpspy_snapshot_profiling) {
   auto &app = apps[0];
-  uint64_t a = 0, b = 0, tsc_hz = 0, tsc = 0;
-  float us = 0, total_us = 0;
-  constexpr float time_constraint_us = 50.f;
-  tsc_hz = estimate_tsc_freq();
+  constexpr float time_constraint_us = 20.f;
 
   phpspy_init(app.pid, &err_buf[0], err_len);
 
+  // std::cout << "Attach perf" << std::endl;
+  // std::cin.get();
+  auto t1 = high_resolution_clock::now();
   for (int i = 0; i < loops; i++) {
-    a = rte_rdtsc();
     phpspy_snapshot(app.pid, &data_buf[0], data_len, &err_buf[0], err_len);
-    us = ((((rte_rdtsc() - a) * 1.f) / (tsc_hz * 1.f)) * 1000000.f);
-    total_us += us;
-    EXPECT_LT(us, time_constraint_us);
   }
+  auto t2 = high_resolution_clock::now();
+  auto total_us = duration_cast<microseconds>(t2 - t1).count();
+  // std::cout << "Detach perf" << std::endl;
+  // std::cin.get();
+
   std::cout << "phpspy_snapshot mean over " << loops
             << " runs: " << total_us / loops << " (us)" << std::endl;
   EXPECT_LT(total_us / loops, time_constraint_us / 2);
   phpspy_cleanup(app.pid, &err_buf[0], err_len);
 }
-*/
+
 class PyroscopeApiTestsChdir : public PyroscopeApiTestsSingleApp {};
 
 TEST_F(PyroscopeApiTestsChdir, init_ok) {
