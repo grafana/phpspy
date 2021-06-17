@@ -1,27 +1,40 @@
-#include <fstream>
 #include <gtest/gtest.h>
+
+#include <chrono>
+#include <fstream>
 #include <iostream>
-#include <rte_cycles.h>
 
 extern "C" {
 #include "phpspy.h"
 #include "pyroscope_api.h"
+#include "pyroscope_api_struct.h"
+
+extern pyroscope_context_t *first_ctx;
+
 void get_process_cwd(char *app_cwd, pid_t pid);
-int parse_output(struct trace_context_s *context, const char *app_root_dir,
-                 char *data_ptr, int data_len, void *err_ptr, int err_len);
+int formulate_output(struct trace_context_s *context, const char *app_root_dir,
+                     char *data_ptr, int data_len, void *err_ptr, int err_len);
+pyroscope_context_t *allocate_context();
+void deallocate_context(pyroscope_context_t *ctx);
+pyroscope_context_t *find_matching_context(pid_t pid);
 }
 
 extern std::map<std::string, pid_t> php_apps;
 
+using std::chrono::duration;
+using std::chrono::duration_cast;
+using std::chrono::high_resolution_clock;
+using std::chrono::microseconds;
+
 class PyroscopeApiTestsBase : public ::testing::Test {
   class App {
-  public:
+   public:
     std::string name;
     pid_t pid;
     std::string expected_stacktrace;
   };
 
-public:
+ public:
   PyroscopeApiTestsBase() {
     char cwd_buf[PATH_MAX]{};
     getcwd(&cwd_buf[0], PATH_MAX);
@@ -32,7 +45,7 @@ public:
       app.name = std::string("main.php");
       app.pid = php_apps[app.name];
       app.expected_stacktrace = "tests/pyroscope_api/" + app.name +
-                                ":5 - wait_a_moment; <internal> - sleep; ";
+                                ":5 - wait_a_moment;<internal> - sleep;";
       apps.push_back(app);
     }
     {
@@ -40,7 +53,7 @@ public:
       app.name = std::string("main_chdir.php");
       app.pid = php_apps[app.name];
       app.expected_stacktrace = gtest_cwd + "/tests/pyroscope_api/" + app.name +
-                                ":7 - wait_a_moment; <internal> - sleep; ";
+                                ":7 - wait_a_moment;<internal> - sleep;";
       apps.push_back(app);
     }
   }
@@ -59,7 +72,7 @@ public:
 };
 
 class PyroscopeApiTestsSingleApp : public PyroscopeApiTestsBase {
-public:
+ public:
 };
 
 TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_ok) {
@@ -68,25 +81,20 @@ TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_ok) {
   EXPECT_STREQ(err_buf, "");
   phpspy_cleanup(app.pid, &err_buf[0], err_len);
 }
-
-TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_exceed_max) {
+/*
+TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_allocate_a_lot) {
+  constexpr int nof = 512;
   auto &app = apps[0];
-  std::string expected_error_msg =
-      "Exceeded maximum allowed number of processes: 32";
-  for (int i = 0; i < 32; i++) {
+  for (int i = 0; i < nof; i++) {
     EXPECT_EQ(phpspy_init(app.pid, &err_buf[0], err_len), 0);
     EXPECT_STREQ(err_buf, "");
   }
 
-  EXPECT_EQ(phpspy_init(app.pid, &err_buf[0], err_len),
-            -static_cast<int>(expected_error_msg.size()));
-  EXPECT_STREQ(err_buf, expected_error_msg.c_str());
-
-  for (int i = 0; i < 33; i++) {
+  for (int i = 0; i < nof; i++) {
     phpspy_cleanup(app.pid, &err_buf[0], err_len);
   }
 }
-
+*/
 TEST_F(PyroscopeApiTestsSingleApp, phpspy_init_same_pid) {
   auto &app = apps[0];
   ASSERT_EQ(phpspy_init(app.pid, &err_buf[0], err_len), 0);
@@ -156,8 +164,124 @@ TEST_F(PyroscopeApiTestsSingleApp, get_process_cwd) {
   EXPECT_STREQ(buf, gtest_cwd.c_str());
 }
 
+class PyroscopeApiTestsLinkedList : public PyroscopeApiTestsBase {
+  void TearDown() { ASSERT_EQ(first_ctx, nullptr); }
+
+ public:
+};
+
+TEST_F(PyroscopeApiTestsLinkedList, allocate_context_first) {
+  ASSERT_EQ(first_ctx, nullptr);
+  pyroscope_context_t empty{};
+
+  pyroscope_context_t *ptr = allocate_context();
+
+  EXPECT_EQ(ptr, first_ctx);
+  EXPECT_EQ(memcmp(first_ctx, &empty, sizeof(pyroscope_context_t)), 0);
+
+  deallocate_context(ptr);
+  EXPECT_EQ(first_ctx, nullptr);
+}
+
+TEST_F(PyroscopeApiTestsLinkedList, allocate_few) {
+  pyroscope_context_t *first = allocate_context();
+  pyroscope_context_t *middle = allocate_context();
+  pyroscope_context_t *last = allocate_context();
+
+  EXPECT_EQ(first, first_ctx);
+  EXPECT_EQ(first->next, middle);
+  EXPECT_EQ(middle->next, last);
+  EXPECT_EQ(last->next, nullptr);
+
+  deallocate_context(first);
+  deallocate_context(middle);
+  deallocate_context(last);
+}
+
+TEST_F(PyroscopeApiTestsLinkedList, allocate_few_deallocate_first) {
+  pyroscope_context_t *first = allocate_context();
+  pyroscope_context_t *middle = allocate_context();
+  pyroscope_context_t *last = allocate_context();
+
+  deallocate_context(first);
+
+  EXPECT_EQ(middle, first_ctx);
+  EXPECT_EQ(middle->next, last);
+  EXPECT_EQ(last->next, nullptr);
+
+  deallocate_context(middle);
+  deallocate_context(last);
+}
+
+TEST_F(PyroscopeApiTestsLinkedList, allocate_few_deallocate_middle) {
+  pyroscope_context_t *first = allocate_context();
+  pyroscope_context_t *middle = allocate_context();
+  pyroscope_context_t *last = allocate_context();
+
+  deallocate_context(middle);
+
+  EXPECT_EQ(first, first_ctx);
+  EXPECT_EQ(first->next, last);
+  EXPECT_EQ(last->next, nullptr);
+
+  deallocate_context(first);
+  deallocate_context(last);
+}
+
+TEST_F(PyroscopeApiTestsLinkedList, allocate_few_deallocate_last) {
+  pyroscope_context_t *first = allocate_context();
+  pyroscope_context_t *middle = allocate_context();
+  pyroscope_context_t *last = allocate_context();
+
+  deallocate_context(last);
+
+  EXPECT_EQ(first, first_ctx);
+  EXPECT_EQ(first->next, middle);
+  EXPECT_EQ(middle->next, nullptr);
+
+  deallocate_context(first);
+  deallocate_context(middle);
+}
+
+TEST_F(PyroscopeApiTestsLinkedList, allocate_context_many) {
+  std::vector<pyroscope_context_t *> allocated;
+
+  for (int i = 0; i < 64; i++) {
+    pyroscope_context_t *ptr = allocate_context();
+
+    allocated.push_back(ptr);
+  }
+
+  for (long unsigned int i = 0; i < allocated.size(); i++) {
+    pyroscope_context_t *current = allocated[i];
+    pyroscope_context_t *next = allocated[i + 1];
+
+    EXPECT_EQ(current->next, next);
+  }
+
+  for (auto *current : allocated) {
+    pyroscope_context_t *next = current->next;
+
+    deallocate_context(current);
+
+    if (current != allocated.back()) {
+      EXPECT_EQ(first_ctx, next);
+    }
+  }
+  EXPECT_EQ(first_ctx, nullptr);
+}
+
+TEST_F(PyroscopeApiTestsLinkedList, deallocate_context) {
+  pyroscope_context_t *ptr = allocate_context();
+  EXPECT_EQ(ptr, first_ctx);
+
+  deallocate_context(ptr);
+
+  ASSERT_EQ(first_ctx, nullptr);
+}
+
 class PyroscopeApiTestsParseOutput : public PyroscopeApiTestsSingleApp {
-public:
+ public:
   void SetUp() {
     memset(&context, 0, sizeof(struct trace_context_s));
     memset(&frames, 0, sizeof(frames));
@@ -182,82 +306,74 @@ public:
   struct trace_context_s context {};
 };
 
-TEST_F(PyroscopeApiTestsParseOutput, parse_output_ok) {
+TEST_F(PyroscopeApiTestsParseOutput, formulate_output_ok) {
   const char app_root_dir[] = "/app/root/dir/";
   std::string expected_stacktrace =
-      "file2:12 - class2::func2; file1:10 - class1::func1; ";
+      "file2:12 - class2::func2;file1:10 - class1::func1;";
   prepare_frame("func1", "class1", "file1", 10, 0);
   prepare_frame("func2", "class2", "file2", 12, 1);
 
-  EXPECT_EQ(parse_output(&context, &app_root_dir[0], &data_buf[0], data_len,
-                         &err_buf[0], err_len),
+  EXPECT_EQ(formulate_output(&context, &app_root_dir[0], &data_buf[0], data_len,
+                             &err_buf[0], err_len),
             expected_stacktrace.size());
   EXPECT_STREQ(data_buf, expected_stacktrace.c_str());
   EXPECT_STREQ(err_buf, "");
 }
 
-TEST_F(PyroscopeApiTestsParseOutput, parse_output_no_class) {
+TEST_F(PyroscopeApiTestsParseOutput, formulate_output_no_class) {
   const char app_root_dir[] = "/app/root/dir/";
-  std::string expected_stacktrace = "file2:12 - func2; file1:10 - func1; ";
+  std::string expected_stacktrace = "file2:12 - func2;file1:10 - func1;";
   prepare_frame("func1", "", "file1", 10, 0);
   prepare_frame("func2", "", "file2", 12, 1);
 
-  EXPECT_EQ(parse_output(&context, &app_root_dir[0], &data_buf[0], data_len,
-                         &err_buf[0], err_len),
+  EXPECT_EQ(formulate_output(&context, &app_root_dir[0], &data_buf[0], data_len,
+                             &err_buf[0], err_len),
             expected_stacktrace.size());
   EXPECT_STREQ(data_buf, expected_stacktrace.c_str());
   EXPECT_STREQ(err_buf, "");
 }
 
-TEST_F(PyroscopeApiTestsParseOutput, parse_output_lineno) {
+TEST_F(PyroscopeApiTestsParseOutput, formulate_output_lineno) {
   const char app_root_dir[] = "/app/root/dir/";
-  std::string expected_stacktrace = "file2:12 - func2; file1 - func1; ";
+  std::string expected_stacktrace = "file2:12 - func2;file1 - func1;";
   prepare_frame("func1", "", "file1", -1, 0);
   prepare_frame("func2", "", "file2", 12, 1);
 
-  EXPECT_EQ(parse_output(&context, &app_root_dir[0], &data_buf[0], data_len,
-                         &err_buf[0], err_len),
+  EXPECT_EQ(formulate_output(&context, &app_root_dir[0], &data_buf[0], data_len,
+                             &err_buf[0], err_len),
             expected_stacktrace.size());
   EXPECT_STREQ(data_buf, expected_stacktrace.c_str());
   EXPECT_STREQ(err_buf, "");
 }
 
-TEST_F(PyroscopeApiTestsParseOutput, parse_output_not_enough_space) {
-  std::string expected_error = "Not enough space! 18 > 10";
+TEST_F(PyroscopeApiTestsParseOutput, formulate_output_not_enough_space) {
+  std::string expected_error = "Not enough space! 17 > 10";
   const char app_root_dir[] = "/app/root/dir/";
   prepare_frame("func1", "", "file1", 10, 0);
   prepare_frame("func2", "", "file2", 12, 1);
 
-  EXPECT_EQ(parse_output(&context, &app_root_dir[0], &data_buf[0], 10,
-                         &err_buf[0], err_len),
+  EXPECT_EQ(formulate_output(&context, &app_root_dir[0], &data_buf[0], 10,
+                             &err_buf[0], err_len),
             -static_cast<int>(expected_error.size()));
   EXPECT_STREQ(err_buf, expected_error.c_str());
 }
 
 class PyroscopeApiTestsProfiling : public PyroscopeApiTestsSingleApp {
-public:
-  static constexpr float loops = 50; // TODO: Cannot exceed MAX_PIDS
-
-  uint64_t estimate_tsc_freq(void) {
-    uint64_t start = rte_rdtsc();
-    sleep(1);
-    return rte_rdtsc() - start;
-  }
+ public:
+  static constexpr float loops = 899;
 };
 
 TEST_F(PyroscopeApiTestsProfiling, phpspy_init_profiling) {
   auto &app = apps[0];
-  uint64_t a = 0, b = 0, tsc_hz = 0, tsc = 0;
-  float us = 0, total_us = 0;
-  constexpr float time_constraint_us = 50000.f;
-  tsc_hz = estimate_tsc_freq();
+
+  constexpr float time_constraint_us = 30000.f;
+
+  auto t1 = high_resolution_clock::now();
   for (int i = 0; i < loops; i++) {
-    a = rte_rdtsc();
     phpspy_init(app.pid, &err_buf[0], err_len);
-    us = ((((rte_rdtsc() - a) * 1.f) / (tsc_hz * 1.f)) * 1000000.f);
-    total_us += us;
-    EXPECT_LT(us, time_constraint_us);
   }
+  auto t2 = high_resolution_clock::now();
+  auto total_us = duration_cast<microseconds>(t2 - t1).count();
   std::cout << "phpspy_init mean over " << loops
             << " runs: " << total_us / loops << " (us)" << std::endl;
   EXPECT_LT(total_us / loops, time_constraint_us / 2);
@@ -269,20 +385,21 @@ TEST_F(PyroscopeApiTestsProfiling, phpspy_init_profiling) {
 
 TEST_F(PyroscopeApiTestsProfiling, phpspy_snapshot_profiling) {
   auto &app = apps[0];
-  uint64_t a = 0, b = 0, tsc_hz = 0, tsc = 0;
-  float us = 0, total_us = 0;
-  constexpr float time_constraint_us = 50.f;
-  tsc_hz = estimate_tsc_freq();
+  constexpr float time_constraint_us = 20.f;
 
   phpspy_init(app.pid, &err_buf[0], err_len);
 
+  // std::cout << "Attach perf" << std::endl;
+  // std::cin.get();
+  auto t1 = high_resolution_clock::now();
   for (int i = 0; i < loops; i++) {
-    a = rte_rdtsc();
     phpspy_snapshot(app.pid, &data_buf[0], data_len, &err_buf[0], err_len);
-    us = ((((rte_rdtsc() - a) * 1.f) / (tsc_hz * 1.f)) * 1000000.f);
-    total_us += us;
-    EXPECT_LT(us, time_constraint_us);
   }
+  auto t2 = high_resolution_clock::now();
+  auto total_us = duration_cast<microseconds>(t2 - t1).count();
+  // std::cout << "Detach perf" << std::endl;
+  // std::cin.get();
+
   std::cout << "phpspy_snapshot mean over " << loops
             << " runs: " << total_us / loops << " (us)" << std::endl;
   EXPECT_LT(total_us / loops, time_constraint_us / 2);
