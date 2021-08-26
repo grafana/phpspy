@@ -95,7 +95,7 @@ static int trace_stack(trace_context_t *context,
       frame->loc.class_name[0] = '\0';
       frame->loc.class_len = 0;
     }
-    if (zfunc.type == 2) {
+    if (zfunc.type == 2 && zfunc.op_array.filename != NULL) {
       try(rv, sprint_zstring(context, "filename", zfunc.op_array.filename,
                              frame->loc.file, sizeof(frame->loc.file),
                              &frame->loc.file_len));
