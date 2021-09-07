@@ -1,4 +1,4 @@
-phpspy_cflags:=-std=gnu2x -Wall -Werror -Wextra -pedantic -O3 $(CFLAGS)
+phpspy_cflags:=-std=gnu2x -Wall -Werror -Wextra -pedantic -O3 -Wno-unused-function $(CFLAGS)
 phpspy_cppflags:=-std=c++2a -Wall -Wextra -pedantic -O3 $(CFLAGS) $(CPPFLAGS)
 phpspy_libs:=-pthread $(LDLIBS)
 phpspy_ldflags:=$(LDFLAGS)
