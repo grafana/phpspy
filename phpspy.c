@@ -1,8 +1,27 @@
 #include "phpspy.h"
 
-[[maybe_unused]] static int copy_proc_mem_syscall(trace_target_t *target,
-                                                  const char *what, void *raddr,
-                                                  void *laddr, size_t size) {
+#ifdef USE_DIRECT
+static int copy_proc_mem_direct(trace_target_t *target,
+                                const char *what, void *raddr,
+                                void *laddr, size_t size) {
+  if (lseek(target->mem_fd, (uint64_t)raddr, SEEK_SET) == -1) {
+    log_error(
+        "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
+        what, strerror(errno), raddr, size);
+    return PHPSPY_ERR;
+  }
+  if (read(target->mem_fd, laddr, size) == -1) {
+    log_error(
+        "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
+        what, strerror(errno), raddr, size);
+    return PHPSPY_ERR;
+  }
+  return PHPSPY_OK;
+}
+#else
+static int copy_proc_mem_syscall(trace_target_t *target,
+                                 const char *what, void *raddr,
+                                 void *laddr, size_t size) {
   struct iovec local;
   struct iovec remote;
   local.iov_base = laddr;
@@ -23,24 +42,7 @@
 
   return PHPSPY_OK;
 }
-
-[[maybe_unused]] static int copy_proc_mem_direct(trace_target_t *target,
-                                                 const char *what, void *raddr,
-                                                 void *laddr, size_t size) {
-  if (lseek(target->mem_fd, (uint64_t)raddr, SEEK_SET) == -1) {
-    log_error(
-        "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
-        what, strerror(errno), raddr, size);
-    return PHPSPY_ERR;
-  }
-  if (read(target->mem_fd, laddr, size) == -1) {
-    log_error(
-        "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
-        what, strerror(errno), raddr, size);
-    return PHPSPY_ERR;
-  }
-  return PHPSPY_OK;
-}
+#endif
 
 int copy_proc_mem(trace_target_t *target, const char *what, void *raddr,
                   void *laddr, size_t size) {
