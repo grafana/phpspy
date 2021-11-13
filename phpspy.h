@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
-#include <php/main/php_config.h>
+#include <main/php_config.h>
 #include <pthread.h>
 #include <regex.h>
 #include <signal.h>
@@ -26,7 +26,7 @@
 #include <unistd.h>
 #undef ZEND_DEBUG
 #define ZEND_DEBUG 0
-#include <php/main/SAPI.h>
+#include <main/SAPI.h>
 #undef snprintf
 #undef vsnprintf
 #undef HASH_ADD
