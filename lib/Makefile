@@ -1,4 +1,4 @@
-phpspy_cflags:=-std=gnu2x -Wall -Werror -Wextra -pedantic -O3 $(CFLAGS)
+phpspy_cflags:=-std=gnu2x -Wall -Werror -Wextra -pedantic -O3 -Wno-unused $(CFLAGS)
 phpspy_cppflags:=-std=c++2a -Wall -Wextra -pedantic -O3 $(CFLAGS) $(CPPFLAGS)
 phpspy_libs:=-pthread $(LDLIBS)
 phpspy_ldflags:=$(LDFLAGS)
@@ -19,10 +19,10 @@ phpspy_includes:=$(phpspy_includes) $$(php-config --includes)
 all: static
 
 tests: static
-	$(CC) $(phpspy_cppflags) $(phpspy_includes) $(termbox_includes) \
-	$(phpspy_defines) $(phpspy_ldflags) $(termbox_libs) -lstdc++ \
+	$(CXX) $(phpspy_cppflags) $(phpspy_includes) $(termbox_includes) \
+	$(phpspy_defines) $(phpspy_ldflags) $(termbox_libs) ./tests/pyroscope_api/*.cpp -lstdc++ \
 	-I /usr/src/gtest -L /usr/local/lib/ -lgtest $(phpspy_libs) \
-	./tests/pyroscope_api/*.cpp ./gtest_main.cpp libphpspy.a \
+	 ./gtest_main.cpp libphpspy.a \
 	-o pyroscope_api_tests
 
 static: $(wildcard *.c *.h)

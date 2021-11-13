@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  test1:
+    cap_add:
+      - SYS_PTRACE
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test1
+    entrypoint: /phpspy/run_pyroscope_api_tests.sh
+  test2:
+    cap_add:
+      - SYS_PTRACE
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test2
+    entrypoint: /phpspy/run_pyroscope_api_tests.sh
