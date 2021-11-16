@@ -47,7 +47,7 @@ static int copy_proc_mem_syscall(trace_target_t *target,
 int copy_proc_mem(trace_target_t *target, const char *what, void *raddr,
                   void *laddr, size_t size) {
   if (raddr == NULL) {
-    log_error("copy_proc_mem_direct: Not copying %s; raddr is NULL\n", what);
+    log_error("copy_proc_mem: Not copying %s; raddr is NULL\n", what);
     return PHPSPY_ERR;
   }
 
