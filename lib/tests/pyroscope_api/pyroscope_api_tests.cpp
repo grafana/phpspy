@@ -280,6 +280,7 @@ TEST_F(PyroscopeApiTestsLinkedList, deallocate_context) {
   ASSERT_EQ(first_ctx, nullptr);
 }
 
+constexpr int max_frames = 50;
 class PyroscopeApiTestsParseOutput : public PyroscopeApiTestsSingleApp {
  public:
   void SetUp() {
@@ -290,7 +291,7 @@ class PyroscopeApiTestsParseOutput : public PyroscopeApiTestsSingleApp {
 
   void prepare_frame(std::string func, std::string class_name, std::string file,
                      int lineno, int frameno) {
-    ASSERT_LT(frameno, PyroscopeApiTestsParseOutput::max_frames);
+    ASSERT_LT(frameno, max_frames);
     auto &frame = frames[frameno];
     strcpy(frame.loc.func, func.c_str());
     strcpy(frame.loc.class_name, class_name.c_str());
@@ -301,8 +302,7 @@ class PyroscopeApiTestsParseOutput : public PyroscopeApiTestsSingleApp {
     frame.loc.lineno = lineno;
     context.event.frame.depth++;
   }
-  static constexpr int max_frames = 50;
-  trace_frame_t frames[PyroscopeApiTestsParseOutput::max_frames]{};
+  trace_frame_t frames[max_frames]{};
   struct trace_context_s context {};
 };
 

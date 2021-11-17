@@ -1,8 +1,8 @@
 #include "phpspy.h"
 
 static int copy_proc_mem_direct(trace_target_t *target,
-                                                 const char *what, void *raddr,
-                                                 void *laddr, size_t size) {
+                                const char *what, void *raddr,
+                                void *laddr, size_t size) {
   if (lseek(target->mem_fd, (uint64_t)raddr, SEEK_SET) == -1) {
     log_error(
         "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
@@ -18,8 +18,8 @@ static int copy_proc_mem_direct(trace_target_t *target,
   return PHPSPY_OK;
 }
 static int copy_proc_mem_syscall(trace_target_t *target,
-                                                  const char *what, void *raddr,
-                                                  void *laddr, size_t size) {
+				const char *what, void *raddr,
+                                void *laddr, size_t size) {
   struct iovec local;
   struct iovec remote;
   local.iov_base = laddr;
