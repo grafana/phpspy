@@ -35,10 +35,14 @@
 
 #include <uthash.h>
 
+// clang-format off
+
 #define try(__rv, __call)                       \
   do {                                           \
     if (((__rv) = (__call)) != 0) return (__rv); \
   } while (0)
+
+// clang-format on
 
 #define PHPSPY_VERSION "0.6.0"
 #define PHPSPY_MIN(a, b) ((a) < (b) ? (a) : (b))
