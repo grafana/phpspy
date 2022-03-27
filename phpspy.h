@@ -35,7 +35,7 @@
 
 #include <uthash.h>
 
-#define try(__rv, __call)                        \
+#define try(__rv, __call)                       \
   do {                                           \
     if (((__rv) = (__call)) != 0) return (__rv); \
   } while (0)

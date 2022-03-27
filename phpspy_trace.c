@@ -1,8 +1,9 @@
 #include "phpspy.h"
 
-#define try_copy_proc_mem(__what, __raddr, __laddr, __size)               \
-  try(rv, copy_proc_mem(&context->target, (__what), (__raddr), (__laddr), \
-                        (__size)))
+#define try_copy_proc_mem(__what, __raddr, __laddr, __size) \
+  try                                                       \
+  (rv,                                                      \
+   copy_proc_mem(&context->target, (__what), (__raddr), (__laddr), (__size)))
 
 static int trace_stack(trace_context_t *context,
                        zend_execute_data *remote_execute_data, int *depth);
@@ -24,8 +25,10 @@ int do_trace(trace_context_t *context) {
   int rv, depth;
   zend_executor_globals executor_globals;
 
-  try(rv, copy_executor_globals(context, &executor_globals));
-  try(rv, context->event_handler(context, PHPSPY_TRACE_EVENT_STACK_BEGIN));
+  try
+    (rv, copy_executor_globals(context, &executor_globals));
+  try
+    (rv, context->event_handler(context, PHPSPY_TRACE_EVENT_STACK_BEGIN));
 
   rv = PHPSPY_OK;
   do {
@@ -48,7 +51,8 @@ int do_trace(trace_context_t *context) {
   } while (0);
 
   if (rv == PHPSPY_OK) {
-    try(rv, context->event_handler(context, PHPSPY_TRACE_EVENT_STACK_END));
+    try
+      (rv, context->event_handler(context, PHPSPY_TRACE_EVENT_STACK_END));
   }
 
   return PHPSPY_OK;
@@ -79,26 +83,29 @@ static int trace_stack(trace_context_t *context,
                       sizeof(execute_data));
     try_copy_proc_mem("zfunc", execute_data.func, &zfunc, sizeof(zfunc));
     if (zfunc.common.function_name) {
-      try(rv, sprint_zstring(context, "function_name",
-                             zfunc.common.function_name, frame->loc.func,
-                             sizeof(frame->loc.func), &frame->loc.func_len));
+      try
+        (rv, sprint_zstring(context, "function_name",
+                            zfunc.common.function_name, frame->loc.func,
+                            sizeof(frame->loc.func), &frame->loc.func_len));
     } else {
       frame->loc.func_len =
           snprintf(frame->loc.func, sizeof(frame->loc.func), "<main>");
     }
     if (zfunc.common.scope) {
       try_copy_proc_mem("zce", zfunc.common.scope, &zce, sizeof(zce));
-      try(rv,
-          sprint_zstring(context, "class_name", zce.name, frame->loc.class_name,
-                         sizeof(frame->loc.class_name), &frame->loc.class_len));
+      try
+        (rv,
+         sprint_zstring(context, "class_name", zce.name, frame->loc.class_name,
+                        sizeof(frame->loc.class_name), &frame->loc.class_len));
     } else {
       frame->loc.class_name[0] = '\0';
       frame->loc.class_len = 0;
     }
     if (zfunc.type == 2 && zfunc.op_array.filename != NULL) {
-      try(rv, sprint_zstring(context, "filename", zfunc.op_array.filename,
-                             frame->loc.file, sizeof(frame->loc.file),
-                             &frame->loc.file_len));
+      try
+        (rv, sprint_zstring(context, "filename", zfunc.op_array.filename,
+                            frame->loc.file, sizeof(frame->loc.file),
+                            &frame->loc.file_len));
       frame->loc.lineno = zfunc.op_array.line_start;
       /* TODO add comments */
     } else {
@@ -107,7 +114,8 @@ static int trace_stack(trace_context_t *context,
       frame->loc.lineno = -1;
     }
     frame->depth = *depth;
-    try(rv, context->event_handler(context, PHPSPY_TRACE_EVENT_FRAME));
+    try
+      (rv, context->event_handler(context, PHPSPY_TRACE_EVENT_FRAME));
     remote_execute_data = execute_data.prev_execute_data;
     *depth += 1;
   }
@@ -157,11 +165,13 @@ static int sprint_zval(trace_context_t *context, zval *lzval, char *buf,
       *buf_len = strlen(buf);
       break;
     case IS_STRING:
-      try(rv, sprint_zstring(context, "zval", lzval->value.str, buf, buf_size,
-                             buf_len));
+      try
+        (rv, sprint_zstring(context, "zval", lzval->value.str, buf, buf_size,
+                            buf_len));
       break;
     case IS_ARRAY:
-      try(rv, sprint_zarray(context, lzval->value.arr, buf, buf_size, buf_len));
+      try
+        (rv, sprint_zarray(context, lzval->value.arr, buf, buf_size, buf_len));
       break;
     default:
       /* TODO handle other zval types */
@@ -190,8 +200,8 @@ static int sprint_zarray(trace_context_t *context, zend_array *rzarray,
                     sizeof(Bucket) * array_len);
 
   for (i = 0; i < array_len; i++) {
-    try(rv,
-        sprint_zarray_bucket(context, buckets + i, buf, buf_size, &tmp_len));
+    try
+      (rv, sprint_zarray_bucket(context, buckets + i, buf, buf_size, &tmp_len));
     buf_size -= tmp_len;
     buf += tmp_len;
 
@@ -218,8 +228,9 @@ static int sprint_zarray_bucket(trace_context_t *context, Bucket *lbucket,
   obuf = buf;
 
   if (lbucket->key != NULL) {
-    try(rv, sprint_zstring(context, "array_key", lbucket->key, tmp_key,
-                           sizeof(tmp_key), &tmp_len));
+    try
+      (rv, sprint_zstring(context, "array_key", lbucket->key, tmp_key,
+                          sizeof(tmp_key), &tmp_len));
 
     /* TODO Introduce a string class to clean this silliness up */
     if (buf_size > tmp_len + 1 + 1) {
@@ -229,7 +240,8 @@ static int sprint_zarray_bucket(trace_context_t *context, Bucket *lbucket,
     }
   }
 
-  try(rv, sprint_zval(context, &lbucket->val, buf, buf_size, &tmp_len));
+  try
+    (rv, sprint_zval(context, &lbucket->val, buf, buf_size, &tmp_len));
   buf += tmp_len;
 
   *buf_len = (size_t)(buf - obuf);

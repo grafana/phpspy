@@ -156,10 +156,11 @@ int phpspy_init(pid_t pid, void *err_ptr, int err_len) {
   pyroscope_context_t *pyroscope_context = allocate_context();
   pyroscope_context->pid = pid;
   get_process_cwd(&pyroscope_context->app_root_dir[0], pid);
-  try(rv, formulate_error_msg(
-              initialize(pid, &pyroscope_context->phpspy_context,
-                         &pyroscope_context->frames[0], event_handler),
-              &pyroscope_context->phpspy_context, err_ptr, err_len));
+  try
+    (rv, formulate_error_msg(
+             initialize(pid, &pyroscope_context->phpspy_context,
+                        &pyroscope_context->frames[0], event_handler),
+             &pyroscope_context->phpspy_context, err_ptr, err_len));
 
   return rv;
 }
@@ -175,9 +176,10 @@ int phpspy_snapshot(pid_t pid, void *ptr, int len, void *err_ptr, int err_len) {
     return -err_msg_len;
   }
 
-  try(rv, formulate_error_msg(do_trace(&pyroscope_context->phpspy_context),
-                              &pyroscope_context->phpspy_context, err_ptr,
-                              err_len));
+  try
+    (rv,
+     formulate_error_msg(do_trace(&pyroscope_context->phpspy_context),
+                         &pyroscope_context->phpspy_context, err_ptr, err_len));
 
   int written = formulate_output(&pyroscope_context->phpspy_context,
                                  &pyroscope_context->app_root_dir[0], ptr, len,
