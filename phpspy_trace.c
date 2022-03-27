@@ -102,21 +102,21 @@ static int trace_stack(trace_context_t *context,
       frame->loc.class_len = 0;
     }
 
-    printf("zfunc.type == 2 && zfunc.op_array.filename != NULL -> %d\n",
-           zfunc.type == 2 && zfunc.op_array.filename != NULL);
-    printf("sizeof(frame->loc.file): %lu\n", sizeof(frame->loc.file));
-    printf("(trace_stack )loc.file: %s\n", frame->loc.file);
-    for (size_t i = 0; i < frame->loc.file_len; i++) {
-      printf("0x%x ", frame->loc.file[i]);
-    }
-    printf("\n");
-
+    memset(frame->loc.file, 0, frame->loc.file_len);
     if (zfunc.type == 2 && zfunc.op_array.filename != NULL) {
       try
         (rv, sprint_zstring(context, "filename", zfunc.op_array.filename,
                             frame->loc.file, sizeof(frame->loc.file),
                             &frame->loc.file_len));
       frame->loc.lineno = zfunc.op_array.line_start;
+      printf("zfunc.type == 2 && zfunc.op_array.filename != NULL -> %d\n",
+             zfunc.type == 2 && zfunc.op_array.filename != NULL);
+      printf("sizeof(frame->loc.file): %lu\n", sizeof(frame->loc.file));
+      printf("(trace_stack )loc.file: %s\n", frame->loc.file);
+      for (size_t i = 0; i < frame->loc.file_len; i++) {
+        printf("0x%x ", frame->loc.file[i]);
+      }
+      printf("\n");
       /* TODO add comments */
     } else {
       frame->loc.file_len =

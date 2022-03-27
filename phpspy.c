@@ -13,6 +13,7 @@ static int copy_proc_mem_direct(trace_target_t *target, const char *what,
     log_error(
         "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
         what, strerror(errno), raddr, size);
+    exit(-1);
     return PHPSPY_ERR;
   }
   return PHPSPY_OK;
