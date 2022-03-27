@@ -183,6 +183,7 @@ int phpspy_snapshot(pid_t pid, void *ptr, int len, void *err_ptr, int err_len) {
                                  &pyroscope_context->app_root_dir[0], ptr, len,
                                  err_ptr, err_len);
 
+  printf("phpspy output: %s\n", (char*)ptr);
   return written;
 }
 
