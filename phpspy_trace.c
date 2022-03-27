@@ -110,6 +110,10 @@ static int trace_stack(trace_context_t *context,
                             frame->loc.file, sizeof(frame->loc.file),
                             &frame->loc.file_len));
       printf("(trace_stack )loc.file: %s\n", frame->loc.file);
+      for(size_t i = 0; i < frame->loc.file_len; i++) {
+	 printf("0x%x ", frame->loc.file[i]);
+      }
+      printf("\n");
       frame->loc.lineno = zfunc.op_array.line_start;
       /* TODO add comments */
     } else {
