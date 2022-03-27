@@ -128,6 +128,10 @@ int formulate_output(struct trace_context_s *context, const char *app_root_dir,
       }
     }
 
+    printf("loc->func: %s\n", loc->func);
+    printf("loc->class_name: %s\n", loc->class_name);
+    printf("loc->file: %s\n", loc->file);
+    printf("func_len, class_len, file_len: %ld, %ld, %ld", loc->func_len, loc->class_len, loc->file_len);
     if (loc->lineno == -1) {
       char out_fmt[] = "%s - %s%s%s;";
       written += snprintf(write_cursor, data_len, out_fmt,
