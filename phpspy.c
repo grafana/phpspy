@@ -107,7 +107,7 @@ int initialize(pid_t pid, struct trace_context_s *context, void *event_udata,
   return rv;
 }
 
-void deinitialize([[maybe_unused]] struct trace_context_s *context) {
+void deinitialize(struct trace_context_s *context) {
 #ifdef USE_DIRECT
   close(context->target.mem_fd);
 #endif
