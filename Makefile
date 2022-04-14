@@ -19,14 +19,18 @@ phpspy_includes:=$(phpspy_includes) $$(php-config --includes)
 all: static
 
 tests: static
-	$(CC) $(phpspy_cppflags) $(phpspy_includes) $(termbox_includes) \
-	$(phpspy_defines) $(phpspy_ldflags) $(termbox_libs) -lstdc++ \
-	-I /usr/src/gtest -L /usr/local/lib/ -lgtest $(phpspy_libs) \
-	./tests/pyroscope_api/*.cpp ./gtest_main.cpp libphpspy.a \
-	-o pyroscope_api_tests
+	$(CXX) $(phpspy_cppflags) $(phpspy_includes) $(termbox_includes) \
+	$(phpspy_defines) $(phpspy_ldflags)\
+	-I /googletest/build/googletest/include/ \
+	-lstdc++ \
+	-o pyroscope_api_tests \
+	./tests/pyroscope_api/*.cpp ./gtest_main.cpp \
+	$(termbox_libs) $(phpspy_libs) \
+	libphpspy.a \
+	-lgtest -lpthread
 
 static: $(wildcard *.c *.h)
-	$(CC) $(phpspy_cflags) $(phpspy_includes) $(phpspy_defines) $(phpspy_sources) -c $(phpspy_ldflags) $(phpspy_libs) -fPIC
+	$(CC) $(phpspy_cflags) -Wno-unused-parameter $(phpspy_includes) $(phpspy_defines) $(phpspy_sources) -c $(phpspy_ldflags) $(phpspy_libs) -fPIC
 	ar rcs libphpspy.a *.o
 
 dynamic: $(wildcard *.c *.h)
