@@ -67,11 +67,18 @@ int get_symbol_addr(addr_memo_t *memo, pid_t pid, const char *symbol,
 }
 
 static int get_php_bin_path(pid_t pid, char *path_root, char *path) {
+  char *libname_awk_patt = getenv("PYROSCOPE_LIBNAME_AWK_PATT");
+  if (libname_awk_patt == NULL || libname_awk_patt[0] == 0) {
+      libname_awk_patt = "libphp[78]?";
+  }
   char buf[PHPSPY_STR_SIZE];
-  char *cmd_fmt =
-      "awk '/libphp[78]/{print $NF; exit 0} END{exit 1}' /proc/%d/maps"
-      " || readlink /proc/%d/exe";
-  if (popen_read_line(buf, sizeof(buf), cmd_fmt, (int)pid, (int)pid) != 0) {
+  char libname[PHPSPY_STR_SIZE];
+  if (shell_escape(libname_awk_patt, libname, sizeof(libname))) {
+    return 1;
+  }
+  char *cmd_fmt = "awk -ve=1 -vp=%s '$0~p{print $NF; e=0; exit} END{exit e}' /proc/%d/maps"
+                " || readlink /proc/%d/exe";
+  if (popen_read_line(buf, sizeof(buf), cmd_fmt, libname, (int)pid, (int)pid) != 0) {
     log_error("get_php_bin_path: Failed\n");
     return 1;
   }
