@@ -16,6 +16,7 @@ int opt_capture_req_cookie = 0;
 int opt_capture_req_uri = 0;
 int opt_capture_req_path = 0;
 int opt_capture_mem = 0;
+char *opt_phpv = "auto";
 
 int opt_continue_on_error = 0;
 
@@ -252,7 +253,33 @@ int initialize(pid_t pid, struct pyroscope_context_t *pyroscope_context, void *e
     context->event_udata = event_udata;
     context->target.pid = pid;
     context->event_handler = event_handler;
+    int rv = 0;
+    if (strcmp(opt_phpv, "auto") == 0) {
+        try(rv, get_php_version(&context->target));
+    }
 
+    if (strcmp("70", opt_phpv) == 0) {
+        pyroscope_context->do_trace_ptr = do_trace_70;
+    } else if (strcmp("71", opt_phpv) == 0) {
+        pyroscope_context->do_trace_ptr = do_trace_71;
+    } else if (strcmp("72", opt_phpv) == 0) {
+        pyroscope_context->do_trace_ptr = do_trace_72;
+    } else if (strcmp("73", opt_phpv) == 0) {
+        pyroscope_context->do_trace_ptr = do_trace_73;
+    } else if (strcmp("74", opt_phpv) == 0) {
+        pyroscope_context->do_trace_ptr = do_trace_74;
+    } else if (strcmp("80", opt_phpv) == 0) {
+        pyroscope_context->do_trace_ptr = do_trace_80;
+    } else if (strcmp("81", opt_phpv) == 0) {
+        pyroscope_context->do_trace_ptr = do_trace_81;
+    } else if (strcmp("82", opt_phpv) == 0) {
+        pyroscope_context->do_trace_ptr = do_trace_82;
+    } else if (strcmp("83", opt_phpv) == 0) {
+        pyroscope_context->do_trace_ptr = do_trace_83; /* TODO verify 8.3 structs */
+    } else {
+        log_error("main_pid: Unrecognized PHP version (%s)\n", opt_phpv);
+        return PHPSPY_ERR;
+    }
 
 //#ifdef USE_DIRECT
 //    context->target.mem_fd = open(path, O_RDONLY);
@@ -267,7 +294,7 @@ int initialize(pid_t pid, struct pyroscope_context_t *pyroscope_context, void *e
 //  }
 //#endif
 
-    int rv = find_addresses(&context->target);
+    rv = find_addresses(&context->target);
 
     return rv;
 }
@@ -361,6 +388,72 @@ uint64_t phpspy_zend_inline_hash_func(const char *str, size_t len) {
     return hash | 0x8000000000000000UL;
 }
 
+static int get_php_version(trace_target_t *target) {
+    struct _zend_module_entry basic_functions_module;
+    char version_cmd[1024];
+    char phpv[4];
+    pid_t pid;
+    FILE *pcmd;
+
+    pid = target->pid;
+    phpv[0] = '\0';
+
+    /* Try reading basic_functions_module */
+    if (target->basic_functions_module_addr) {
+        if (copy_proc_mem(pid, "basic_functions_module", (void*)target->basic_functions_module_addr, &basic_functions_module, sizeof(basic_functions_module)) == 0) {
+            copy_proc_mem(pid, "basic_functions_module.version", (void*)basic_functions_module.version, phpv, 3);
+        }
+    }
+
+    /* Try greping binary */
+    if (phpv[0] == '\0') {
+        char libname[PHPSPY_STR_SIZE];
+        if (shell_escape(opt_libname_awk_patt, libname, sizeof(libname), "opt_libname_awk_patt")) {
+            return PHPSPY_ERR;
+        }
+        int n = snprintf(
+                version_cmd,
+                sizeof(version_cmd),
+                "{ echo -n /proc/%d/root/; "
+                "  awk -ve=1 -vp=%s '$0~p{print $NF; e=0; exit} END{exit e}' /proc/%d/maps "
+                "  || readlink /proc/%d/exe; } "
+                "| { xargs stat --printf=%%n 2>/dev/null || echo /proc/%d/exe; } "
+                "| xargs strings "
+                "| grep -Po '(?<=X-Powered-By: PHP/)\\d\\.\\d'",
+                pid, libname, pid, pid, pid
+        );
+        if ((size_t)n >= sizeof(version_cmd) - 1) {
+            log_error("get_php_version: snprintf overflow\n");
+            return PHPSPY_ERR;
+        }
+
+        if ((pcmd = popen(version_cmd, "r")) == NULL) {
+            perror("get_php_version: popen");
+            return PHPSPY_ERR;
+        } else if (fread(&phpv, sizeof(char), 3, pcmd) != 3) {
+            log_error("get_php_version: Could not detect PHP version\n");
+            pclose(pcmd);
+            return PHPSPY_ERR;
+        }
+        pclose(pcmd);
+    }
+
+    if      (strncmp(phpv, "7.0", 3) == 0) opt_phpv = "70";
+    else if (strncmp(phpv, "7.1", 3) == 0) opt_phpv = "71";
+    else if (strncmp(phpv, "7.2", 3) == 0) opt_phpv = "72";
+    else if (strncmp(phpv, "7.3", 3) == 0) opt_phpv = "73";
+    else if (strncmp(phpv, "7.4", 3) == 0) opt_phpv = "74";
+    else if (strncmp(phpv, "8.0", 3) == 0) opt_phpv = "80";
+    else if (strncmp(phpv, "8.1", 3) == 0) opt_phpv = "81";
+    else if (strncmp(phpv, "8.2", 3) == 0) opt_phpv = "82";
+    else if (strncmp(phpv, "8.3", 3) == 0) opt_phpv = "83";
+    else {
+        log_error("get_php_version: Unrecognized PHP version (%s)\n", phpv);
+        return PHPSPY_ERR;
+    }
+
+    return PHPSPY_OK;
+}
 
 
 #define phpv 70
