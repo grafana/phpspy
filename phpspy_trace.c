@@ -27,7 +27,7 @@ static int sprint_zarray_bucket(trace_context_t *context, Bucket *lbucket, char 
  *
  * @return int Status code
  */
-static int do_trace(trace_context_t *context) {
+int do_trace(trace_context_t *context) {
     int rv, depth;
     zend_executor_globals executor_globals;
 

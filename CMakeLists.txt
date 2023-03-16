@@ -7,12 +7,10 @@ project(phpspy C)
 
 set(CMAKE_C_STANDARD 17)
 
-add_library(phpspy STATIC top.c addr_objdump.c pyroscope_api.c)
+add_library(phpspy STATIC addr_objdump.c phpspy.c pyroscope_api.c )
 target_include_directories(phpspy PUBLIC . ./vendor ./vendor/termbox2/)
 target_compile_definitions(phpspy PUBLIC PYROSCOPE=1)
 
 add_executable(pyroscope_api_playground playground.c)
 target_link_libraries(pyroscope_api_playground phpspy)
 
-add_executable(phpspy_main phpspy.c pgrep.c event_callgrind.c event_fout.c addr_objdump.c pyroscope_api.c top.c)
-target_include_directories(phpspy_main PUBLIC . ./vendor ./vendor/termbox2/)
