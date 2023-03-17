@@ -1,5 +1,5 @@
 #define try_copy_proc_mem(__what, __raddr, __laddr, __size) \
-    try(rv, copy_proc_mem(context->target.pid, (__what), (__raddr), (__laddr), (__size)))
+    try(rv, copy_proc_mem(&context->target, (__what), (__raddr), (__laddr), (__size)))
 
 static int trace_stack(trace_context_t *context, zend_execute_data *remote_execute_data, int *depth);
 static int trace_request_info(trace_context_t *context);
@@ -125,7 +125,7 @@ static int trace_stack(trace_context_t *context, zend_execute_data *remote_execu
             frame->loc.lineno = zfunc.op_array.line_start;
             /* TODO add comments */
             if (HASH_CNT(hh, varpeek_map) > 0) {
-                if (copy_proc_mem(target->pid, "opline", (void*)execute_data.opline, &zop, sizeof(zop)) == PHPSPY_OK) {
+                if (copy_proc_mem(target, "opline", (void*)execute_data.opline, &zop, sizeof(zop)) == PHPSPY_OK) {
                     trace_locals(context, &zop, remote_execute_data, &zfunc.op_array, frame->loc.file, frame->loc.file_len);
                 }
             }

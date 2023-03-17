@@ -22,7 +22,7 @@ glopeek_entry_t *glopeek_map = NULL;
 int log_error_enabled = 1;
 
 int find_addresses(trace_target_t *target);
-int copy_proc_mem(pid_t pid, const char *what, void *raddr, void *laddr, size_t size);
+int copy_proc_mem(trace_target_t *target, const char *what, void *raddr, void *laddr, size_t size);
 
 #ifdef USE_ZEND
 #error "USE_ZEND is not supported"
@@ -66,29 +66,19 @@ int find_addresses(trace_target_t *target) {
     return PHPSPY_OK;
 }
 
-int copy_proc_mem(pid_t pid, const char *what, void *raddr, void *laddr, size_t size) {
-    struct iovec local[1];
-    struct iovec remote[1];
-
-    if (raddr == NULL) {
-        log_error("copy_proc_mem: Not copying %s; raddr is NULL\n", what);
+int copy_proc_mem(trace_target_t *target, const char *what, void *raddr, void *laddr, size_t size) {
+    if (lseek(target->mem_fd, (uint64_t)raddr, SEEK_SET) == -1) {
+        log_error(
+                "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
+                what, strerror(errno), raddr, size);
         return PHPSPY_ERR;
     }
-
-    local[0].iov_base = laddr;
-    local[0].iov_len = size;
-    remote[0].iov_base = raddr;
-    remote[0].iov_len = size;
-
-    if (process_vm_readv(pid, local, 1, remote, 1, 0) == -1) {
-        if (errno == ESRCH) { /* No such process */
-            perror("process_vm_readv");
-            return PHPSPY_ERR | PHPSPY_ERR_PID_DEAD;
-        }
-        log_error("copy_proc_mem: Failed to copy %s; err=%s raddr=%p size=%lu\n", what, strerror(errno), raddr, size);
+    if (read(target->mem_fd, laddr, size) == -1) {
+        log_error(
+                "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
+                what, strerror(errno), raddr, size);
         return PHPSPY_ERR;
     }
-
     return PHPSPY_OK;
 }
 
@@ -104,8 +94,8 @@ int get_php_version(trace_target_t *target) {
 
     /* Try reading basic_functions_module */
     if (target->basic_functions_module_addr) {
-        if (copy_proc_mem(pid, "basic_functions_module", (void*)target->basic_functions_module_addr, &basic_functions_module, sizeof(basic_functions_module)) == 0) {
-            copy_proc_mem(pid, "basic_functions_module.version", (void*)basic_functions_module.version, phpv, 3);
+        if (copy_proc_mem(target, "basic_functions_module", (void*)target->basic_functions_module_addr, &basic_functions_module, sizeof(basic_functions_module)) == 0) {
+            copy_proc_mem(target, "basic_functions_module.version", (void*)basic_functions_module.version, phpv, 3);
         }
     }
 

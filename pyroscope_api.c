@@ -230,14 +230,12 @@ int initialize(pid_t pid, struct pyroscope_context_t *pyroscope_context, void *e
                int (*event_handler)(struct trace_context_s *context,
                                     int event_type)) {
     struct trace_context_s *context = &pyroscope_context->phpspy_context;
-//    static const char path_fmt[] = "/proc/%d/mem";
-//    char path[PATH_MAX];
-//    snprintf(&path[0], PATH_MAX, &path_fmt[0], pid);
 
     context->event_udata = event_udata;
     context->target.pid = pid;
     context->event_handler = event_handler;
     int rv = 0;
+
     if (strcmp(opt_phpv, "auto") == 0) {
         try(rv, get_php_version(&context->target));
     }
@@ -265,19 +263,20 @@ int initialize(pid_t pid, struct pyroscope_context_t *pyroscope_context, void *e
         return PHPSPY_ERR;
     }
 
-    //todo
-//#ifdef USE_DIRECT
-//    context->target.mem_fd = open(path, O_RDONLY);
-//
-//  if (context->target.mem_fd < 0) {
-//    log_error("initialize: Failed to initialize for pid %d; err=%s\n", pid,
-//              strerror(errno));
-//    if (errno == ESRCH) {
-//      return PHPSPY_ERR | PHPSPY_ERR_PID_DEAD;
-//    }
-//    return PHPSPY_ERR;
-//  }
-//#endif
+    static const char path_fmt[] = "/proc/%d/mem";
+    char path[PATH_MAX];
+    snprintf(&path[0], PATH_MAX, &path_fmt[0], pid);
+
+    context->target.mem_fd = open(path, O_RDONLY);
+
+    if (context->target.mem_fd < 0) {
+        log_error("initialize: Failed to initialize for pid %d; err=%s\n", pid,
+                  strerror(errno));
+        if (errno == ESRCH) {
+            return PHPSPY_ERR | PHPSPY_ERR_PID_DEAD;
+        }
+        return PHPSPY_ERR;
+    }
 
     rv = find_addresses(&context->target);
 
@@ -285,9 +284,6 @@ int initialize(pid_t pid, struct pyroscope_context_t *pyroscope_context, void *e
 }
 
 void deinitialize(struct pyroscope_context_t *pyroscope_context) {
-    //todo
-//#ifdef USE_DIRECT
-//    close(context->target.mem_fd);
-//#endif
+    close(pyroscope_context->phpspy_context.target.mem_fd);
 }
 
