@@ -94,31 +94,25 @@ int event_handler(struct trace_context_s *context, int event_type) {
   return PHPSPY_OK;
 }
 
-int formulate_error_msg(int rv, struct trace_context_s *context, char *err_ptr,
-                        int err_len) {
-  int err_msg_len = 0;
-  if (rv != (PHPSPY_OK)) {
-    switch (rv) {
-        //todo this is always false
-      case (((unsigned int)PHPSPY_ERR) & ((unsigned int)PHPSPY_ERR_PID_DEAD)): {
-        err_msg_len = snprintf((char *)err_ptr, err_len,
-                               "App with PID %d is dead!", context->target.pid);
-        break;
-      }
-      case (PHPSPY_ERR): {
-        err_msg_len = snprintf((char *)err_ptr, err_len, "General error!");
-        break;
-      }
-      default: {
+int formulate_error_msg(int rv, struct trace_context_s *context, char *err_ptr, int err_len) {
+    int err_msg_len = 0;
+    if (rv == PHPSPY_OK) {
+        return 0;
+    }
+    if ((rv & PHPSPY_ERR) == 0) {
         err_msg_len =
-            snprintf((char *)err_ptr, err_len, "Unknown error code: %u",
-                     (unsigned int)rv & ~((unsigned int)PHPSPY_ERR));
-        break;
-      }
+                snprintf((char *) err_ptr, err_len, "Unknown error code: %u",
+                         (unsigned int) rv & ~((unsigned int) PHPSPY_ERR));
+    } else if (rv & PHPSPY_ERR_PID_DEAD) {
+        err_msg_len = snprintf((char *) err_ptr, err_len,
+                               "App with PID %d is dead!", context->target.pid);
+    } else if (rv & PHPSPY_ERR_BUF_FULL) {
+        err_msg_len = snprintf((char *) err_ptr, err_len,
+                               "Buffer is full with PID %d", context->target.pid);
+    } else {
+        err_msg_len = snprintf((char *) err_ptr, err_len, "General error!");
     }
     return err_msg_len < err_len ? -err_msg_len : -err_len;
-  }
-  return 0;
 }
 
 void get_process_cwd(char *app_cwd, pid_t pid) {
