@@ -69,17 +69,16 @@ int find_addresses(trace_target_t *target) {
 }
 
 int copy_proc_mem(trace_target_t *target, const char *what, void *raddr, void *laddr, size_t size) {
-//    printf("copy_proc_mem fd=%d\n", target->mem_fd);
     if (lseek(target->mem_fd, (uint64_t)raddr, SEEK_SET) == -1) {
         log_error(
-                "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu fd=%d\n",
-                what, strerror(errno), raddr, size, target->mem_fd);
+                "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
+                what, strerror(errno), raddr, size);
         return PHPSPY_ERR;
     }
     if (read(target->mem_fd, laddr, size) == -1) {
         log_error(
-                "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu fd=%d\n",
-                what, strerror(errno), raddr, size, target->mem_fd);
+                "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
+                what, strerror(errno), raddr, size);
         return PHPSPY_ERR;
     }
     return PHPSPY_OK;
