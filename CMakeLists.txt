@@ -14,3 +14,6 @@ target_compile_definitions(phpspy PUBLIC PYROSCOPE=1)
 add_executable(pyroscope_api_playground playground.c)
 target_link_libraries(pyroscope_api_playground phpspy)
 
+#target_compile_options(phpspy PRIVATE -fsanitize=address)
+#target_compile_options(pyroscope_api_playground PRIVATE -fsanitize=address)
+#target_link_options(pyroscope_api_playground PRIVATE -fsanitize=address)

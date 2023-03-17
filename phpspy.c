@@ -3,6 +3,8 @@
 #define TB_IMPL
 #define TB_OPT_V1_COMPAT
 #include "termbox.h"
+#include "pyroscope_api_struct.h"
+
 #undef TB_IMPL
 
 uint64_t opt_executor_globals_addr = 0;
@@ -13,7 +15,7 @@ int opt_capture_req_cookie = 0;
 int opt_capture_req_uri = 0;
 int opt_capture_req_path = 0;
 int opt_capture_mem = 0;
-int opt_max_stack_depth = -1;
+int opt_max_stack_depth = PYROSCOPE_MAX_STACK_DEPTH;
 char *opt_phpv = "auto";
 int opt_continue_on_error = 0;
 char *opt_libname_awk_patt = "libphp[78]?";
@@ -67,16 +69,17 @@ int find_addresses(trace_target_t *target) {
 }
 
 int copy_proc_mem(trace_target_t *target, const char *what, void *raddr, void *laddr, size_t size) {
+//    printf("copy_proc_mem fd=%d\n", target->mem_fd);
     if (lseek(target->mem_fd, (uint64_t)raddr, SEEK_SET) == -1) {
         log_error(
-                "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
-                what, strerror(errno), raddr, size);
+                "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu fd=%d\n",
+                what, strerror(errno), raddr, size, target->mem_fd);
         return PHPSPY_ERR;
     }
     if (read(target->mem_fd, laddr, size) == -1) {
         log_error(
-                "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
-                what, strerror(errno), raddr, size);
+                "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu fd=%d\n",
+                what, strerror(errno), raddr, size, target->mem_fd);
         return PHPSPY_ERR;
     }
     return PHPSPY_OK;
