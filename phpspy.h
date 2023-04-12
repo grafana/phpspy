@@ -209,6 +209,7 @@ extern int opt_continue_on_error;
 extern int opt_fout_buffer_size;
 extern long opt_time_limit_ms;
 extern char *opt_libname_awk_patt;
+extern int opt_direct_mem;
 
 extern int main_pgrep();
 extern int main_pid(pid_t pid);

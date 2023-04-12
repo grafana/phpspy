@@ -19,6 +19,7 @@ int opt_max_stack_depth = PYROSCOPE_MAX_STACK_DEPTH;
 char *opt_phpv = "auto";
 int opt_continue_on_error = 0;
 char *opt_libname_awk_patt = "libphp[78]?";
+int opt_direct_mem = 0;
 varpeek_entry_t *varpeek_map = NULL;
 glopeek_entry_t *glopeek_map = NULL;
 int log_error_enabled = 1;

@@ -167,7 +167,29 @@ int formulate_output(struct trace_context_s *context, const char *app_root_dir,
   return written;
 }
 
-int phpspy_init(pid_t pid, void *err_ptr, int err_len) {
+void phpspy_init_spy(const char *args) {
+    char *args_copy = strdup(args);
+    char *saveptr1 = NULL, *saveptr2 = NULL;
+
+    char *key_value_pair = strtok_r(args_copy, ",", &saveptr1);
+
+    while (key_value_pair != NULL) {
+        char *key = strtok_r(key_value_pair, "=", &saveptr2);
+        char *value = strtok_r(NULL, "=", &saveptr2);
+
+        if (strcmp(key, "direct_mem") == 0) {
+            opt_direct_mem = strcmp(value, "true") == 0;
+        } else if (strcmp(key, "libphp_awk_pattern") == 0) {
+            opt_libname_awk_patt = strdup(value);
+        }
+
+        key_value_pair = strtok_r(NULL, ",", &saveptr1);
+    }
+
+    free(args_copy);
+}
+
+int phpspy_init_pid(pid_t pid, void *err_ptr, int err_len) {
   int rv = 0;
 
   pyroscope_context_t *pyroscope_context = allocate_context();
