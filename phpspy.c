@@ -1,8 +1,5 @@
 #include "phpspy.h"
 
-#define TB_IMPL
-#define TB_OPT_V1_COMPAT
-#include "termbox.h"
 #include "pyroscope_api_struct.h"
 
 #undef TB_IMPL
@@ -99,7 +96,7 @@ static int copy_proc_mem_vm_read(trace_target_t *target, const char *what, void 
 static int copy_proc_mem_direct(trace_target_t *target, const char *what, void *raddr, void *laddr, size_t size) {
     if (target->mem_fd_alive_check) {
         target->mem_fd_alive_check = 0;
-        struct stat s = {};
+        struct stat s = {0};
         int alive_check_result = stat(target->mem_path, &s);
         if (alive_check_result != 0) {
             return PHPSPY_ERR | PHPSPY_ERR_PID_DEAD;
