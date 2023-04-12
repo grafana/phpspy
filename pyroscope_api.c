@@ -189,7 +189,7 @@ void phpspy_init_spy(const char *args) {
 
         if (strcmp(key, "direct_mem") == 0) {
             opt_direct_mem = strcmp(value, "true") == 0;
-        } else if (strcmp(key, "libphp_awk_pattern") == 0) {
+        } else if (strcmp(key, "php_awk_pattern") == 0) {
             opt_libname_awk_patt = strdup(value);
         }
 

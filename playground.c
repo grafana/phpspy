@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
         puts("usage: playground ${pid}");
         return -1;
     }
-    phpspy_init_spy("direct_mem=true,libphp_awk_pattern=bin/php");
+    phpspy_init_spy("direct_mem=true,php_awk_pattern=libphp");
     p = atoi(argv[1]);
     res = phpspy_init_pid(p, err, sizeof(err));
     printf("phpspy_init: %d\n", res);
