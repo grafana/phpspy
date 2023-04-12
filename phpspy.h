@@ -27,7 +27,6 @@
 #include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
-#include <termbox.h>
 #include <regex.h>
 
 #ifdef USE_ZEND
@@ -158,6 +157,9 @@ typedef struct trace_glopeek_s {
 
 typedef struct trace_target_s {
     pid_t pid;
+    char mem_path[PATH_MAX];
+    int mem_fd;
+    int mem_fd_alive_check;
     uint64_t executor_globals_addr;
     uint64_t sapi_globals_addr;
     uint64_t alloc_globals_addr;
@@ -208,6 +210,7 @@ extern int opt_continue_on_error;
 extern int opt_fout_buffer_size;
 extern long opt_time_limit_ms;
 extern char *opt_libname_awk_patt;
+extern int opt_direct_mem;
 
 extern int main_pgrep();
 extern int main_pid(pid_t pid);
