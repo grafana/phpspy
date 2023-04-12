@@ -6,19 +6,29 @@
 #include <unistd.h>
 
 int get_php_version(trace_target_t *target);
+
 int do_trace_70(trace_context_t *context);
+
 int do_trace_71(trace_context_t *context);
+
 int do_trace_72(trace_context_t *context);
+
 int do_trace_73(trace_context_t *context);
+
 int do_trace_74(trace_context_t *context);
+
 int do_trace_80(trace_context_t *context);
+
 int do_trace_81(trace_context_t *context);
+
 int do_trace_82(trace_context_t *context);
+
 int do_trace_83(trace_context_t *context);
 
 extern char *opt_phpv;
 
 int find_addresses(trace_target_t *target);
+
 int initialize(pid_t pid,
                struct pyroscope_context_t *pyroscope_context,
                void *event_udata,
@@ -30,68 +40,68 @@ void deinitialize(struct pyroscope_context_t *pyroscope_context);
 pyroscope_context_t *first_ctx = NULL;
 
 pyroscope_context_t *allocate_context() {
-  if (NULL == first_ctx) {
-    first_ctx = calloc(sizeof(pyroscope_context_t), 1);
-    return first_ctx;
-  }
-
-  pyroscope_context_t *current = first_ctx;
-  while (1) {
-    if (NULL == current->next) {
-      current->next = calloc(sizeof(pyroscope_context_t), 1);
-      return current->next;
-    } else {
-      current = current->next;
+    if (NULL == first_ctx) {
+        first_ctx = calloc(sizeof(pyroscope_context_t), 1);
+        return first_ctx;
     }
-  }
+
+    pyroscope_context_t *current = first_ctx;
+    while (1) {
+        if (NULL == current->next) {
+            current->next = calloc(sizeof(pyroscope_context_t), 1);
+            return current->next;
+        } else {
+            current = current->next;
+        }
+    }
 }
 
 void deallocate_context(pyroscope_context_t *ctx) {
-  if (ctx == first_ctx) {
-    first_ctx = ctx->next;
-  } else {
-    pyroscope_context_t *iter = first_ctx;
-    while (1) {
-      if (iter->next == ctx) {
-        iter->next = ctx->next;
-        break;
-      }
-      iter = iter->next;
+    if (ctx == first_ctx) {
+        first_ctx = ctx->next;
+    } else {
+        pyroscope_context_t *iter = first_ctx;
+        while (1) {
+            if (iter->next == ctx) {
+                iter->next = ctx->next;
+                break;
+            }
+            iter = iter->next;
+        }
     }
-  }
 
-  free(ctx);
+    free(ctx);
 }
 
 pyroscope_context_t *find_matching_context(pid_t pid) {
-  pyroscope_context_t *ctx = first_ctx;
+    pyroscope_context_t *ctx = first_ctx;
 
-  while (1) {
-    if (NULL == ctx) {
-      return NULL;
-    }
+    while (1) {
+        if (NULL == ctx) {
+            return NULL;
+        }
 
-    if (ctx->pid == pid) {
-      return ctx;
-    } else {
-      ctx = ctx->next;
+        if (ctx->pid == pid) {
+            return ctx;
+        } else {
+            ctx = ctx->next;
+        }
     }
-  }
 }
 
 int event_handler(struct trace_context_s *context, int event_type) {
-  switch (event_type) {
-    case PHPSPY_TRACE_EVENT_FRAME: {
-      trace_frame_t *frames = (trace_frame_t *)context->event_udata;
-      memcpy(&frames[context->event.frame.depth], &context->event.frame,
-             sizeof(trace_frame_t));
-      break;
+    switch (event_type) {
+        case PHPSPY_TRACE_EVENT_FRAME: {
+            trace_frame_t *frames = (trace_frame_t *) context->event_udata;
+            memcpy(&frames[context->event.frame.depth], &context->event.frame,
+                   sizeof(trace_frame_t));
+            break;
+        }
+        case PHPSPY_TRACE_EVENT_ERROR: {
+            return PHPSPY_TRACE_EVENT_ERROR;
+        }
     }
-    case PHPSPY_TRACE_EVENT_ERROR: {
-      return PHPSPY_TRACE_EVENT_ERROR;
-    }
-  }
-  return PHPSPY_OK;
+    return PHPSPY_OK;
 }
 
 int formulate_error_msg(int rv, struct trace_context_s *context, char *err_ptr, int err_len) {
@@ -116,55 +126,55 @@ int formulate_error_msg(int rv, struct trace_context_s *context, char *err_ptr, 
 }
 
 void get_process_cwd(char *app_cwd, pid_t pid) {
-  char buf[PATH_MAX];
-  snprintf(buf, PATH_MAX, "/proc/%d/cwd", pid);
-  int app_cwd_len = readlink(buf, app_cwd, PATH_MAX);
+    char buf[PATH_MAX];
+    snprintf(buf, PATH_MAX, "/proc/%d/cwd", pid);
+    int app_cwd_len = readlink(buf, app_cwd, PATH_MAX);
 
-  if (app_cwd_len < 0) {
-    app_cwd[0] = '\0';
-  }
+    if (app_cwd_len < 0) {
+        app_cwd[0] = '\0';
+    }
 }
 
 int formulate_output(struct trace_context_s *context, const char *app_root_dir,
                      char *data_ptr, int data_len, void *err_ptr, int err_len) {
-  int written = 0;
-  const int nof_frames = context->event.frame.depth;
+    int written = 0;
+    const int nof_frames = context->event.frame.depth;
 
-  for (int current_frame_idx = (nof_frames - 1); current_frame_idx >= 0;
-       current_frame_idx--) {
-    trace_frame_t *frames = (trace_frame_t *)context->event_udata;
-    trace_loc_t *loc = &frames[current_frame_idx].loc;
+    for (int current_frame_idx = (nof_frames - 1); current_frame_idx >= 0;
+         current_frame_idx--) {
+        trace_frame_t *frames = (trace_frame_t *) context->event_udata;
+        trace_loc_t *loc = &frames[current_frame_idx].loc;
 
-    char *write_cursor = ((char *)data_ptr) + written;
+        char *write_cursor = ((char *) data_ptr) + written;
 
-    int file_path_beginning = 0;
-    if (app_root_dir[0] != '\0') {
-      const int root_path_len = strlen(app_root_dir);
-      if (memcmp(loc->file, app_root_dir, root_path_len) == 0) {
-        file_path_beginning = root_path_len + 1;
-      }
+        int file_path_beginning = 0;
+        if (app_root_dir[0] != '\0') {
+            const int root_path_len = strlen(app_root_dir);
+            if (memcmp(loc->file, app_root_dir, root_path_len) == 0) {
+                file_path_beginning = root_path_len + 1;
+            }
+        }
+
+        if (loc->lineno == -1) {
+            char out_fmt[] = "%s - %s%s%s;";
+            written += snprintf(write_cursor, data_len, out_fmt,
+                                &loc->file[file_path_beginning], loc->class,
+                                loc->class_len ? "::" : "", loc->func);
+        } else {
+            char out_fmt[] = "%s:%d - %s%s%s;";
+            written += snprintf(
+                    write_cursor, data_len, out_fmt, &loc->file[file_path_beginning],
+                    loc->lineno, loc->class, loc->class_len ? "::" : "", loc->func);
+        }
+
+        if (written > data_len) {
+            int err_msg_len =
+                    snprintf((char *) err_ptr, err_len, "Not enough space! %d > %d",
+                             written, data_len);
+            return -err_msg_len;
+        }
     }
-
-    if (loc->lineno == -1) {
-      char out_fmt[] = "%s - %s%s%s;";
-      written += snprintf(write_cursor, data_len, out_fmt,
-                          &loc->file[file_path_beginning], loc->class,
-                          loc->class_len ? "::" : "", loc->func);
-    } else {
-      char out_fmt[] = "%s:%d - %s%s%s;";
-      written += snprintf(
-          write_cursor, data_len, out_fmt, &loc->file[file_path_beginning],
-          loc->lineno, loc->class, loc->class_len ? "::" : "", loc->func);
-    }
-
-    if (written > data_len) {
-      int err_msg_len =
-          snprintf((char *)err_ptr, err_len, "Not enough space! %d > %d",
-                   written, data_len);
-      return -err_msg_len;
-    }
-  }
-  return written;
+    return written;
 }
 
 void phpspy_init_spy(const char *args) {
@@ -190,56 +200,58 @@ void phpspy_init_spy(const char *args) {
 }
 
 int phpspy_init_pid(pid_t pid, void *err_ptr, int err_len) {
-  int rv = 0;
+    int rv = 0;
 
-  pyroscope_context_t *pyroscope_context = allocate_context();
-  pyroscope_context->pid = pid;
-  get_process_cwd(&pyroscope_context->app_root_dir[0], pid);
-  try
+    pyroscope_context_t *pyroscope_context = allocate_context();
+    pyroscope_context->pid = pid;
+    get_process_cwd(&pyroscope_context->app_root_dir[0], pid);
+    try
     (rv, formulate_error_msg(
-             initialize(pid, pyroscope_context,
-                        &pyroscope_context->frames[0], event_handler),
-             &pyroscope_context->phpspy_context, err_ptr, err_len));
+            initialize(pid, pyroscope_context,
+                       &pyroscope_context->frames[0], event_handler),
+            &pyroscope_context->phpspy_context, err_ptr, err_len));
 
-  return rv;
+    return rv;
 }
 
 int phpspy_snapshot(pid_t pid, void *ptr, int len, void *err_ptr, int err_len) {
-  int rv = 0;
+    int rv = 0;
 
-  pyroscope_context_t *pyroscope_context = find_matching_context(pid);
+    pyroscope_context_t *pyroscope_context = find_matching_context(pid);
 
-  if (NULL == pyroscope_context) {
-    int err_msg_len = snprintf((char *)err_ptr, err_len,
-                               "Phpspy not initialized for %d pid", pid);
-    return -err_msg_len;
-  }
-
-  try
+    if (NULL == pyroscope_context) {
+        int err_msg_len = snprintf((char *) err_ptr, err_len,
+                                   "Phpspy not initialized for %d pid", pid);
+        return -err_msg_len;
+    }
+    if (opt_direct_mem) {
+        pyroscope_context->phpspy_context.target.mem_fd_alive_check = 1;
+    }
+    try
     (rv,
      formulate_error_msg(pyroscope_context->do_trace_ptr(&pyroscope_context->phpspy_context),
                          &pyroscope_context->phpspy_context, err_ptr, err_len));
 
-  int written = formulate_output(&pyroscope_context->phpspy_context,
-                                 &pyroscope_context->app_root_dir[0], ptr, len,
-                                 err_ptr, err_len);
+    int written = formulate_output(&pyroscope_context->phpspy_context,
+                                   &pyroscope_context->app_root_dir[0], ptr, len,
+                                   err_ptr, err_len);
 
-  return written;
+    return written;
 }
 
 int phpspy_cleanup(pid_t pid, void *err_ptr, int err_len) {
-  pyroscope_context_t *pyroscope_context = find_matching_context(pid);
+    pyroscope_context_t *pyroscope_context = find_matching_context(pid);
 
-  if (NULL == pyroscope_context) {
-    int err_msg_len = snprintf((char *)err_ptr, err_len,
-                               "Phpspy not initialized for %d pid", pid);
-    return -err_msg_len;
-  }
+    if (NULL == pyroscope_context) {
+        int err_msg_len = snprintf((char *) err_ptr, err_len,
+                                   "Phpspy not initialized for %d pid", pid);
+        return -err_msg_len;
+    }
 
-  deinitialize(pyroscope_context);
-  deallocate_context(pyroscope_context);
+    deinitialize(pyroscope_context);
+    deallocate_context(pyroscope_context);
 
-  return 0;
+    return 0;
 }
 
 int initialize(pid_t pid, struct pyroscope_context_t *pyroscope_context, void *event_udata,
@@ -280,10 +292,9 @@ int initialize(pid_t pid, struct pyroscope_context_t *pyroscope_context, void *e
     }
 
     static const char path_fmt[] = "/proc/%d/mem";
-    char path[PATH_MAX];
-    snprintf(&path[0], PATH_MAX, &path_fmt[0], pid);
+    snprintf(context->target.mem_path, PATH_MAX, &path_fmt[0], pid);
 
-    context->target.mem_fd = open(path, O_RDONLY);
+    context->target.mem_fd = open(context->target.mem_path, O_RDONLY);
 
     if (context->target.mem_fd < 0) {
         log_error("initialize: Failed to initialize for pid %d; err=%s\n", pid,

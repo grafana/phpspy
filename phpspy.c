@@ -69,8 +69,43 @@ int find_addresses(trace_target_t *target) {
     return PHPSPY_OK;
 }
 
-int copy_proc_mem(trace_target_t *target, const char *what, void *raddr, void *laddr, size_t size) {
-    if (lseek(target->mem_fd, (uint64_t)raddr, SEEK_SET) == -1) {
+static int copy_proc_mem_vm_read(trace_target_t *target, const char *what, void *raddr, void *laddr, size_t size) {
+    pid_t pid = target->pid;
+    struct iovec local[1];
+    struct iovec remote[1];
+
+    if (raddr == NULL) {
+        log_error("copy_proc_mem: Not copying %s; raddr is NULL\n", what);
+        return PHPSPY_ERR;
+    }
+
+    local[0].iov_base = laddr;
+    local[0].iov_len = size;
+    remote[0].iov_base = raddr;
+    remote[0].iov_len = size;
+
+    if (process_vm_readv(pid, local, 1, remote, 1, 0) == -1) {
+        if (errno == ESRCH) { /* No such process */
+            perror("process_vm_readv");
+            return PHPSPY_ERR | PHPSPY_ERR_PID_DEAD;
+        }
+        log_error("copy_proc_mem: Failed to copy %s; err=%s raddr=%p size=%lu\n", what, strerror(errno), raddr, size);
+        return PHPSPY_ERR;
+    }
+
+    return PHPSPY_OK;
+}
+
+static int copy_proc_mem_direct(trace_target_t *target, const char *what, void *raddr, void *laddr, size_t size) {
+    if (target->mem_fd_alive_check) {
+        target->mem_fd_alive_check = 0;
+        struct stat s = {};
+        int alive_check_result = stat(target->mem_path, &s);
+        if (alive_check_result != 0) {
+            return PHPSPY_ERR | PHPSPY_ERR_PID_DEAD;
+        }
+    }
+    if (lseek(target->mem_fd, (uint64_t) raddr, SEEK_SET) == -1) {
         log_error(
                 "copy_proc_mem_direct: Failed to copy %s; err=%s raddr=%p size=%lu\n",
                 what, strerror(errno), raddr, size);
@@ -83,6 +118,14 @@ int copy_proc_mem(trace_target_t *target, const char *what, void *raddr, void *l
         return PHPSPY_ERR;
     }
     return PHPSPY_OK;
+}
+
+int copy_proc_mem(trace_target_t *target, const char *what, void *raddr, void *laddr, size_t size) {
+    if (opt_direct_mem) {
+        return copy_proc_mem_direct(target, what, raddr, laddr, size);
+    } else {
+        return copy_proc_mem_vm_read(target, what, raddr, laddr, size);
+    }
 }
 
 int get_php_version(trace_target_t *target) {

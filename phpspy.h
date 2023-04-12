@@ -158,7 +158,9 @@ typedef struct trace_glopeek_s {
 
 typedef struct trace_target_s {
     pid_t pid;
+    char mem_path[PATH_MAX];
     int mem_fd;
+    int mem_fd_alive_check;
     uint64_t executor_globals_addr;
     uint64_t sapi_globals_addr;
     uint64_t alloc_globals_addr;
