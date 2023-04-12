@@ -8,12 +8,10 @@ project(phpspy C)
 set(CMAKE_C_STANDARD 17)
 
 add_library(phpspy STATIC addr_objdump.c phpspy.c pyroscope_api.c )
-target_include_directories(phpspy PUBLIC . ./vendor ./vendor/termbox2/)
+target_include_directories(phpspy PUBLIC . ./vendor)
 target_compile_definitions(phpspy PUBLIC PYROSCOPE=1)
+target_compile_options(phpspy PRIVATE -Wall -Werror -Wextra -pedantic  -Wno-unused-parameter -Wno-address-of-packed-member -fPIC)
 
 add_executable(pyroscope_api_playground playground.c)
 target_link_libraries(pyroscope_api_playground phpspy)
 
-#target_compile_options(phpspy PRIVATE -fsanitize=address)
-#target_compile_options(pyroscope_api_playground PRIVATE -fsanitize=address)
-#target_link_options(pyroscope_api_playground PRIVATE -fsanitize=address)

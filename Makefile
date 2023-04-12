@@ -6,8 +6,6 @@ phpspy_defines:=
 phpspy_tests:=$(wildcard tests/test_*.sh)
 phpspy_sources:=addr_objdump.c phpspy.c pyroscope_api.c
 
-termbox_inlcudes=-Ivendor/termbox2/
-
 prefix?=/usr/local
 
 php_path?=php
@@ -25,13 +23,9 @@ endif
 
 all: static
 
-static: $(wildcard *.c *.h) vendor/termbox2/termbox.h
-	$(CC) $(phpspy_cflags) $(phpspy_includes) $(termbox_inlcudes) $(phpspy_defines) $(phpspy_sources) -c $(phpspy_ldflags) $(phpspy_libs)
+static: $(wildcard *.c *.h)
+	$(CC) $(phpspy_cflags) $(phpspy_includes) $(phpspy_defines) $(phpspy_sources) -c $(phpspy_ldflags) $(phpspy_libs)
 	ar rcs libphpspy.a *.o
-
-vendor/termbox2/termbox.h:
-	git submodule update --init --remote --recursive
-	cd vendor/termbox2 && git reset --hard
 
 clean:
 	rm -f libphpspy.a *.o

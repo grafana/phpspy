@@ -27,7 +27,6 @@
 #include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
-#include <termbox.h>
 #include <regex.h>
 
 #ifdef USE_ZEND
